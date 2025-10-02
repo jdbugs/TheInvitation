@@ -64,15 +64,18 @@ cancels the pending task so silence never speaks over a fresh offering.
 ## Oracle Client — optional local model
 
 `engine/oracle.py` talks to an Ollama server (or stays dormant if the server is
-missing). Configuration can override the model name, server URL, or disable the
-oracle entirely. The weave honours the `oracle_weight` parameter, making it easy
-to dial how frequently the model is invoked.
+missing). The `oracle.*` section of `config/invitation.json` toggles the client,
+chooses the model, and sets HTTP timeouts. The weave honours the
+`oracle_weight` parameter, making it easy to dial how frequently the model is
+invoked.
 
 ## Terminal Portal & Chorus
 
 The default surface is the terminal (`ui/terminal_display.py`). It shows each
 response, along with metadata about channel, length, layers, and architecture.
-An optional text-to-speech chorus (`voice/tts_interface.py`) mirrors the text.
+The `surface.*` section controls whether that blueprint line appears and whether
+the text-to-speech chorus (`voice/tts_interface.py`) should speak alongside the
+text. Chorus voice, rate, and volume can be tuned live.
 
 ## Adaptive configuration
 
@@ -83,6 +86,8 @@ edits you make—during runtime—are applied live:
 1. The constellation rehydrates if clipping or mutation settings change.
 2. The weave adjusts its architecture cascade, oracle weighting, and biases.
 3. The observer and its feedback tuner adopt the new pacing and guardrails.
+4. The oracle client and terminal surface refresh whenever `oracle.*` or
+   `surface.*` change.
 
 You can also override the config path with `INVITATION_CONFIG`. The watcher polls
 for changes at the cadence set by `monitor.poll_interval`.

@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict
 import asyncio
 import json
 import logging
-import os
 import urllib.error
 import urllib.request
+
+from .configuration import OracleConfig
 
 LOGGER = logging.getLogger("invitation.oracle")
 
@@ -18,6 +18,8 @@ class OracleSettings:
     base_url: str
     model: str
     enabled: bool
+    request_timeout: float = 12.0
+    response_timeout: float = 6.0
 
 
 class OracleClient:
@@ -30,15 +32,29 @@ class OracleClient:
     def enabled(self) -> bool:
         return self._settings.enabled
 
+    @property
+    def response_timeout(self) -> float:
+        return self._settings.response_timeout
+
+    @property
+    def request_timeout(self) -> float:
+        return self._settings.request_timeout
+
     @classmethod
-    def from_env(cls) -> "OracleClient":
-        disable = os.environ.get("INVITATION_DISABLE_LLM", "0").lower() in {"1", "true", "yes"}
-        if disable:
+    def from_config(cls, config: OracleConfig) -> "OracleClient":
+        if not config.enabled:
+            LOGGER.info("oracle disabled via configuration")
             return cls.disabled()
-        base_url = os.environ.get("INVITATION_OLLAMA_URL", "http://localhost:11434")
-        model = os.environ.get("INVITATION_MODEL", "llama3.2")
-        LOGGER.info("oracle primed for %s via %s", model, base_url)
-        return cls(OracleSettings(base_url=base_url, model=model, enabled=True))
+        LOGGER.info("oracle primed for %s via %s", config.model, config.base_url)
+        return cls(
+            OracleSettings(
+                base_url=config.base_url,
+                model=config.model,
+                enabled=True,
+                request_timeout=config.request_timeout,
+                response_timeout=config.response_timeout,
+            )
+        )
 
     @classmethod
     def disabled(cls) -> "OracleClient":
@@ -55,7 +71,7 @@ class OracleClient:
         )
         loop = asyncio.get_running_loop()
         try:
-            raw = await loop.run_in_executor(None, self._execute, request)
+            raw = await loop.run_in_executor(None, self._execute, request, self._settings.request_timeout)
         except (urllib.error.URLError, TimeoutError) as exc:  # pragma: no cover - I/O failures
             LOGGER.warning("oracle connection failed: %s", exc)
             return None
@@ -71,8 +87,8 @@ class OracleClient:
         return text.strip() or None
 
     @staticmethod
-    def _execute(request: urllib.request.Request) -> bytes:
-        with urllib.request.urlopen(request, timeout=12) as response:  # nosec B310 (local endpoint)
+    def _execute(request: urllib.request.Request, timeout: float) -> bytes:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310 (local endpoint)
             return response.read()
 
 

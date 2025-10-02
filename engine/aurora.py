@@ -43,6 +43,7 @@ class AuroraWeave:
         self._constellation = constellation
         self._rng = rng or random.Random()
         self._oracle = oracle or OracleClient.disabled()
+        self._oracle_timeout = getattr(self._oracle, "response_timeout", 6.0)
         self._metamorphosis = metamorphosis
         self._configure_weave(config)
         self._length_history: List[int] = []
@@ -89,6 +90,14 @@ class AuroraWeave:
     def set_constellation(self, constellation: MycelialConstellation) -> None:
         self._constellation = constellation
         LOGGER.info("aurora weave constellation swapped")
+
+    def set_oracle(self, oracle: OracleClient, *, response_timeout: float | None = None) -> None:
+        self._oracle = oracle
+        if response_timeout is not None:
+            self._oracle_timeout = max(0.5, response_timeout)
+        else:
+            self._oracle_timeout = getattr(oracle, "response_timeout", self._oracle_timeout)
+        LOGGER.info("aurora oracle updated (enabled=%s)", oracle.enabled)
 
     @property
     def active_architecture(self) -> str:
@@ -181,7 +190,8 @@ class AuroraWeave:
         ]
         prompt = "\n".join(prompt_lines)
         try:
-            response = await asyncio.wait_for(self._oracle.dream(prompt), timeout=6)
+            timeout = getattr(self._oracle, "response_timeout", self._oracle_timeout)
+            response = await asyncio.wait_for(self._oracle.dream(prompt), timeout=timeout)
         except asyncio.TimeoutError:
             LOGGER.warning("oracle timed out for %s", architecture.name)
             return None

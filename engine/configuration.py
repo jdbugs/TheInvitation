@@ -88,6 +88,29 @@ class MonitorConfig:
 
 
 @dataclass(frozen=True)
+class OracleConfig:
+    enabled: bool = True
+    base_url: str = "http://localhost:11434"
+    model: str = "llama3.2"
+    request_timeout: float = 12.0
+    response_timeout: float = 6.0
+
+
+@dataclass(frozen=True)
+class ChorusConfig:
+    enabled: bool = True
+    voice: str | None = None
+    rate: int | None = None
+    volume: float | None = None
+
+
+@dataclass(frozen=True)
+class SurfaceConfig:
+    show_blueprint: bool = True
+    chorus: ChorusConfig = field(default_factory=ChorusConfig)
+
+
+@dataclass(frozen=True)
 class EngineConfig:
     field: FieldConfig
     weave: WeaveConfig
@@ -95,6 +118,8 @@ class EngineConfig:
     feedback: FeedbackConfig
     metamorphosis: MetamorphosisConfig
     monitor: MonitorConfig
+    oracle: OracleConfig
+    surface: SurfaceConfig
 
 
 _DEFAULTS: Dict[str, Dict[str, Any]] = {
@@ -146,6 +171,22 @@ _DEFAULTS: Dict[str, Dict[str, Any]] = {
         "reactivity": MetamorphosisConfig().reactivity,
     },
     "monitor": {"poll_interval": MonitorConfig().poll_interval},
+    "oracle": {
+        "enabled": OracleConfig().enabled,
+        "base_url": OracleConfig().base_url,
+        "model": OracleConfig().model,
+        "request_timeout": OracleConfig().request_timeout,
+        "response_timeout": OracleConfig().response_timeout,
+    },
+    "surface": {
+        "show_blueprint": SurfaceConfig().show_blueprint,
+        "chorus": {
+            "enabled": ChorusConfig().enabled,
+            "voice": ChorusConfig().voice,
+            "rate": ChorusConfig().rate,
+            "volume": ChorusConfig().volume,
+        },
+    },
 }
 
 
@@ -272,6 +313,35 @@ def _coerce(data: Dict[str, Dict[str, Any]]) -> EngineConfig:
     monitor_conf = MonitorConfig(
         poll_interval=max(0.5, float(data["monitor"]["poll_interval"]))
     )
+    oracle_conf = OracleConfig(
+        enabled=bool(data["oracle"].get("enabled", True)),
+        base_url=str(data["oracle"].get("base_url", "http://localhost:11434")).strip() or "http://localhost:11434",
+        model=str(data["oracle"].get("model", "llama3.2")).strip() or "llama3.2",
+        request_timeout=max(1.0, float(data["oracle"].get("request_timeout", OracleConfig().request_timeout))),
+        response_timeout=max(0.5, float(data["oracle"].get("response_timeout", OracleConfig().response_timeout))),
+    )
+    chorus_data = data.get("surface", {}).get("chorus", {}) if data.get("surface") else {}
+    voice_value = chorus_data.get("voice")
+    rate_value = chorus_data.get("rate")
+    volume_value = chorus_data.get("volume")
+    try:
+        rate_parsed = int(float(rate_value)) if rate_value not in (None, "") else None
+    except (TypeError, ValueError):
+        rate_parsed = None
+    try:
+        volume_parsed = float(volume_value) if volume_value not in (None, "") else None
+    except (TypeError, ValueError):
+        volume_parsed = None
+    chorus_conf = ChorusConfig(
+        enabled=bool(chorus_data.get("enabled", True)),
+        voice=(str(voice_value) if voice_value not in (None, "") else None),
+        rate=rate_parsed,
+        volume=volume_parsed,
+    )
+    surface_conf = SurfaceConfig(
+        show_blueprint=bool(data.get("surface", {}).get("show_blueprint", True)),
+        chorus=chorus_conf,
+    )
     return EngineConfig(
         field=field_conf,
         weave=weave_conf,
@@ -279,6 +349,8 @@ def _coerce(data: Dict[str, Dict[str, Any]]) -> EngineConfig:
         feedback=feedback_conf,
         metamorphosis=metamorph_conf,
         monitor=monitor_conf,
+        oracle=oracle_conf,
+        surface=surface_conf,
     )
 
 

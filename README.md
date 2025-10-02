@@ -36,15 +36,9 @@ contributed extra language.
 2. Clone the repository and open a terminal inside it.
 3. (Optional) Create and activate a virtual environment.
 4. Install optional extras if you want speech (`pip install pyttsx3`).
-5. If you don’t have Ollama running locally, disable the oracle:
-   ```bash
-   export INVITATION_DISABLE_LLM=1  # Linux/macOS
-   set INVITATION_DISABLE_LLM=1     # Windows CMD
-   $env:INVITATION_DISABLE_LLM = "1"  # PowerShell
-   ```
-6. (Optional) Edit `config/invitation.json` to tune pacing, layering, or
-   architecture.
-7. Run the engine:
+5. Edit `config/invitation.json` to suit your session—LLM, TTS, pacing, and
+   architectures all live there and can be changed before or during a run.
+6. Run the engine:
    ```bash
    python main.py
    ```
@@ -59,11 +53,9 @@ the JSON file every few seconds and applies updates live—no restarts required.
 
 Environment variable | Description | Default
 -------------------- | ----------- | -------
-`INVITATION_DISABLE_LLM` | Turn off the oracle entirely | `0`
-`INVITATION_MODEL` | Ollama model to request | `llama3.2`
-`INVITATION_OLLAMA_URL` | Base URL for the Ollama server | `http://localhost:11434`
 `INVITATION_TIME_SCALE` | Float multiplier to speed or slow timing | `1.0`
 `INVITATION_CONFIG` | Path to a custom config JSON file | `config/invitation.json`
+`INVITATION_LOG_LEVEL` | Logging verbosity (`INFO`, `DEBUG`, …) | `INFO`
 
 Key sections inside `config/invitation.json`:
 
@@ -74,6 +66,8 @@ Key sections inside `config/invitation.json`:
 * `feedback` — sets the adaptive targets for response length and delay scaling.
 * `metamorphosis` — governs how quickly the weave drifts between architectures.
 * `monitor` — changes how often the configuration watcher checks for updates.
+* `oracle` — toggles the Ollama client, model, and HTTP timeouts.
+* `surface` — controls terminal blueprint display and the text-to-speech chorus.
 
 ## Tests
 

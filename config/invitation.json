@@ -45,5 +45,21 @@
   },
   "monitor": {
     "poll_interval": 1.2
+  },
+  "oracle": {
+    "enabled": true,
+    "base_url": "http://localhost:11434",
+    "model": "llama3.2",
+    "request_timeout": 12.0,
+    "response_timeout": 6.0
+  },
+  "surface": {
+    "show_blueprint": true,
+    "chorus": {
+      "enabled": true,
+      "voice": null,
+      "rate": null,
+      "volume": null
+    }
   }
 }

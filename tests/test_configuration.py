@@ -7,7 +7,12 @@ import os
 import tempfile
 import unittest
 
-from engine.configuration import AdaptiveConfig, EngineConfig, FieldConfig, resolve_config_path
+from engine.configuration import (
+    AdaptiveConfig,
+    EngineConfig,
+    FieldConfig,
+    resolve_config_path,
+)
 
 
 class ConfigurationTests(unittest.TestCase):
@@ -20,6 +25,8 @@ class ConfigurationTests(unittest.TestCase):
             self.assertIsInstance(snapshot, EngineConfig)
             self.assertEqual(snapshot.field.clip, 300)
             self.assertGreater(len(snapshot.weave.architectures), 0)
+            self.assertTrue(snapshot.oracle.enabled)
+            self.assertTrue(snapshot.surface.show_blueprint)
 
     def test_watch_applies_updates(self) -> None:
         async def scenario() -> None:
@@ -27,15 +34,18 @@ class ConfigurationTests(unittest.TestCase):
                 config_path = Path(tmp) / "invitation.json"
                 config_path.write_text(json.dumps({"field": {"clip": 360}}), encoding="utf-8")
                 adaptive = AdaptiveConfig(config_path)
-                seen: list[int] = []
+                seen: list[EngineConfig] = []
 
                 def listener(config: EngineConfig) -> None:
-                    seen.append(config.field.clip)
+                    seen.append(config)
 
                 adaptive.add_listener(listener)
                 task = asyncio.create_task(adaptive.watch(interval=0.2))
                 await asyncio.sleep(0.3)
-                config_path.write_text(json.dumps({"field": {"clip": 280}}), encoding="utf-8")
+                config_path.write_text(
+                    json.dumps({"field": {"clip": 280}, "oracle": {"enabled": False}}),
+                    encoding="utf-8",
+                )
                 await asyncio.sleep(0.5)
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
@@ -45,7 +55,9 @@ class ConfigurationTests(unittest.TestCase):
         import contextlib
 
         seen = asyncio.run(scenario())
-        self.assertIn(280, seen)
+        clips = [config.field.clip for config in seen]
+        self.assertIn(280, clips)
+        self.assertTrue(any(not config.oracle.enabled for config in seen))
 
     def test_resolve_config_path_env_override(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

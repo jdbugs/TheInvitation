@@ -13,6 +13,7 @@ from engine.configuration import AdaptiveConfig, EngineConfig, resolve_config_pa
 from engine.observer import FeedbackTuning, PulseSettings, WitnessObserver
 from engine.oracle import OracleClient
 from ui.terminal_display import TerminalPortal
+from voice.tts_interface import AmbientChorus
 
 LOGGER = logging.getLogger("invitation.main")
 
@@ -38,6 +39,23 @@ def _scaled(settings: PulseSettings) -> PulseSettings:
     )
 
 
+def _build_oracle(config: EngineConfig) -> OracleClient:
+    return OracleClient.from_config(config.oracle)
+
+
+def _build_chorus(config: EngineConfig) -> AmbientChorus | None:
+    chorus_cfg = config.surface.chorus
+    if not chorus_cfg.enabled:
+        return None
+    chorus = AmbientChorus(
+        enabled=chorus_cfg.enabled,
+        voice=chorus_cfg.voice,
+        rate=chorus_cfg.rate,
+        volume=chorus_cfg.volume,
+    )
+    return chorus if chorus.enabled else chorus
+
+
 async def main() -> None:
     _configure_logging()
     base = Path(__file__).parent
@@ -46,14 +64,18 @@ async def main() -> None:
     snapshot = adaptive.snapshot()
 
     constellation = MycelialConstellation.from_data_dir(base / "data", snapshot.field)
-    oracle = OracleClient.from_env()
+    oracle = _build_oracle(snapshot)
     weave = AuroraWeave(
         constellation,
         config=snapshot.weave,
         metamorphosis=snapshot.metamorphosis,
         oracle=oracle,
     )
-    display = TerminalPortal()
+    chorus = _build_chorus(snapshot)
+    display = TerminalPortal(
+        show_blueprint=snapshot.surface.show_blueprint,
+        chorus=chorus,
+    )
     observer = WitnessObserver(
         weave,
         display,
@@ -81,9 +103,10 @@ async def main() -> None:
     )
 
     current_config = snapshot
+    current_oracle = oracle
 
     def apply(update: EngineConfig) -> None:
-        nonlocal constellation, current_config
+        nonlocal constellation, current_config, current_oracle
         if update.field != current_config.field:
             constellation = MycelialConstellation.from_data_dir(base / "data", update.field)
             weave.set_constellation(constellation)
@@ -111,6 +134,15 @@ async def main() -> None:
                 silence_ceiling=update.feedback.silence_ceiling,
             ),
         )
+        if update.oracle != current_config.oracle:
+            current_oracle = _build_oracle(update)
+            weave.set_oracle(current_oracle, response_timeout=update.oracle.response_timeout)
+        if update.surface != current_config.surface:
+            chorus = _build_chorus(update)
+            display.apply_surface(
+                show_blueprint=update.surface.show_blueprint,
+                chorus=chorus,
+            )
         current_config = update
         LOGGER.info("configuration applied")
 
