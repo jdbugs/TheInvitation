@@ -27,7 +27,10 @@ class TerminalPortal:
         payload = ["", response.text]
         blueprint = response.blueprint
         sigil = blueprint.get("channel", "unknown")
-        payload.append(f"[{sigil}] :: {len(response.text)} chars :: {len(blueprint.get('layers', []))} layers")
+        architecture = blueprint.get("architecture", "constellation")
+        payload.append(
+            f"[{sigil}:{architecture}] :: {len(response.text)} chars :: {len(blueprint.get('layers', []))} layers"
+        )
         await self._emit_lines(payload)
 
     async def close(self) -> None:

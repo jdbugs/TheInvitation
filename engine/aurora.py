@@ -42,33 +42,33 @@ class AuroraWeave:
         oracle: OracleClient | None = None,
         max_layers: int = 3,
         max_chars: int = 560,
+        architecture: str = "hybrid",
+        oracle_weight: float = 0.4,
         rng: random.Random | None = None,
     ) -> None:
         self._atlas = atlas
         self._oracle = oracle or OracleClient.disabled()
         self._max_layers = max_layers
         self._max_chars = max_chars
+        self._architecture = architecture
+        self._oracle_weight = oracle_weight
         self._rng = rng or random.Random()
 
+    @property
+    def max_layers(self) -> int:
+        return self._max_layers
+
+    @property
+    def architecture(self) -> str:
+        return self._architecture
+
     async def compose(self, request: WeaveRequest) -> WeaveResponse:
-        LOGGER.debug("composing %s request", request.channel)
-        shards = self._select_shards(request)
-        fragments = [self._render_shard(shard) for shard in shards]
-        if request.prompt:
-            fragments.insert(0, self._render_prompt(request.prompt))
-        fragments = fragments[: self._max_layers]
-        stitched = self._stitch(fragments)
-        oracle_note = await self._maybe_consult_oracle(request, stitched)
-        if oracle_note:
-            stitched = self._clip(f"{stitched}\n{oracle_note}")
-        blueprint = {
-            "channel": request.channel,
-            "layers": [shard.describe() for shard in shards],
-            "echoes": list(request.echoes),
-        }
-        if oracle_note:
-            blueprint["oracle"] = oracle_note[:80]
-        return WeaveResponse(text=stitched, blueprint=blueprint)
+        LOGGER.debug("composing %s request via %s", request.channel, self._architecture)
+        if self._architecture == "oracle" and self._oracle.enabled:
+            oracle_response = await self._oracle_primary(request)
+            if oracle_response:
+                return oracle_response
+        return await self._compose_constellation(request)
 
     def _select_shards(self, request: WeaveRequest) -> List[Shard]:
         tags = list(request.tags or [])
@@ -128,4 +128,87 @@ class AuroraWeave:
             return None
         LOGGER.debug("oracle contributed %d chars", len(response))
         return self._clip(response.strip())
+
+    def reconfigure(
+        self,
+        *,
+        max_layers: int | None = None,
+        max_chars: int | None = None,
+        architecture: str | None = None,
+        oracle_weight: float | None = None,
+    ) -> None:
+        if max_layers is not None:
+            self._max_layers = max(1, int(max_layers))
+        if max_chars is not None:
+            self._max_chars = max(80, int(max_chars))
+        if architecture is not None:
+            self._architecture = architecture
+        if oracle_weight is not None:
+            self._oracle_weight = max(0.0, min(1.0, float(oracle_weight)))
+        LOGGER.info(
+            "aurora reconfigured (layers=%s, chars=%s, architecture=%s, weight=%.2f)",
+            self._max_layers,
+            self._max_chars,
+            self._architecture,
+            self._oracle_weight,
+        )
+
+    def set_atlas(self, atlas: ConstellationAtlas) -> None:
+        self._atlas = atlas
+        LOGGER.info("aurora atlas swapped")
+
+    def _should_consult_oracle(self) -> bool:
+        if not self._oracle.enabled:
+            return False
+        if self._architecture == "constellation":
+            return self._rng.random() < self._oracle_weight * 0.25
+        if self._architecture == "hybrid":
+            return self._rng.random() < self._oracle_weight
+        if self._architecture == "oracle":
+            return True
+        return False
+
+    async def _oracle_primary(self, request: WeaveRequest) -> WeaveResponse:
+        context_lines = []
+        if request.prompt:
+            context_lines.append(self._render_prompt(request.prompt))
+        if request.echoes:
+            context_lines.append("recent echoes:" + " | ".join(request.echoes[-3:]))
+        oracle_body = "\n".join(context_lines) or "You are the hush between breaths."
+        oracle_note = await self._maybe_consult_oracle(request, oracle_body)
+        if not oracle_note:
+            LOGGER.debug("oracle primary fell back to constellation")
+            return None
+        blueprint = {
+            "channel": request.channel,
+            "layers": [],
+            "echoes": list(request.echoes),
+            "architecture": self._architecture,
+            "oracle": oracle_note[:120],
+        }
+        return WeaveResponse(text=oracle_note, blueprint=blueprint)
+
+    async def _compose_constellation(self, request: WeaveRequest) -> WeaveResponse:
+        shards = self._select_shards(request)
+        fragments = [self._render_shard(shard) for shard in shards]
+        if request.prompt:
+            fragments.insert(0, self._render_prompt(request.prompt))
+        fragments = fragments[: self._max_layers]
+        stitched = self._stitch(fragments)
+
+        oracle_note: str | None = None
+        if self._should_consult_oracle():
+            oracle_note = await self._maybe_consult_oracle(request, stitched)
+            if oracle_note:
+                stitched = self._clip(f"{stitched}\n{oracle_note}")
+
+        blueprint = {
+            "channel": request.channel,
+            "layers": [shard.describe() for shard in shards],
+            "echoes": list(request.echoes),
+            "architecture": self._architecture,
+        }
+        if oracle_note:
+            blueprint["oracle"] = oracle_note[:80]
+        return WeaveResponse(text=stitched, blueprint=blueprint)
 

@@ -21,7 +21,14 @@ class DummyAtlas(ConstellationAtlas):
 class AuroraTests(unittest.TestCase):
     def test_weave_concise_response(self) -> None:
         atlas = DummyAtlas()
-        weave = AuroraWeave(atlas, max_layers=3, max_chars=240, rng=random.Random(1))
+        weave = AuroraWeave(
+            atlas,
+            max_layers=3,
+            max_chars=240,
+            architecture="hybrid",
+            oracle_weight=0.0,
+            rng=random.Random(1),
+        )
         request = WeaveRequest(channel="input", prompt="tell me something", echoes=["prev"], tags=["memory"])
 
         async def run() -> str:
@@ -30,13 +37,14 @@ class AuroraTests(unittest.TestCase):
             self.assertIn("you offered", response.text)
             self.assertEqual(response.blueprint["channel"], "input")
             self.assertLessEqual(len(response.blueprint["layers"]), 3)
+            self.assertEqual(response.blueprint["architecture"], "hybrid")
             return response.text
 
         asyncio.run(run())
 
     def test_silence_prefers_stillness(self) -> None:
         atlas = DummyAtlas()
-        weave = AuroraWeave(atlas, max_layers=2, rng=random.Random(2))
+        weave = AuroraWeave(atlas, max_layers=2, architecture="constellation", oracle_weight=0.0, rng=random.Random(2))
 
         async def run() -> str:
             response = await weave.compose(WeaveRequest(channel="silence", prompt=None, echoes=[]))
@@ -45,4 +53,12 @@ class AuroraTests(unittest.TestCase):
             return response.text
 
         asyncio.run(run())
+
+    def test_reconfigure_adjusts_layers_and_architecture(self) -> None:
+        atlas = DummyAtlas()
+        weave = AuroraWeave(atlas, max_layers=1, architecture="constellation", oracle_weight=0.0, rng=random.Random(3))
+        self.assertEqual(weave.max_layers, 1)
+        weave.reconfigure(max_layers=4, architecture="oracle", oracle_weight=0.9)
+        self.assertEqual(weave.max_layers, 4)
+        self.assertEqual(weave.architecture, "oracle")
 

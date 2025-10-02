@@ -5,17 +5,25 @@ import random
 import unittest
 
 from engine.aurora import WeaveResponse
-from engine.observer import ObserverSettings, ThresholdObserver
+from engine.observer import FeedbackSettings, ObserverSettings, ThresholdObserver
 
 
 class StubComposer:
     def __init__(self) -> None:
         self.calls = []
+        self.max_layers = 2
+        self.architecture = "hybrid"
 
     async def compose(self, request):
         self.calls.append(request)
         text = f"[{request.channel}] {request.prompt or 'silence'}"
         return WeaveResponse(text=text, blueprint={"channel": request.channel, "layers": []})
+
+    def reconfigure(self, **updates):
+        if "max_layers" in updates:
+            self.max_layers = updates["max_layers"]
+        if "architecture" in updates:
+            self.architecture = updates["architecture"]
 
 
 class StubDisplay:
@@ -39,7 +47,8 @@ class ObserverTests(unittest.TestCase):
 
         async def scenario():
             settings = ObserverSettings(min_delay=0.01, max_delay=0.02, min_silence=0.2, max_silence=0.2)
-            observer = ThresholdObserver(composer, display, settings=settings, rng=random.Random(0))
+            feedback = FeedbackSettings(target_length=20, tolerance=10, adjust_rate=0.2, architecture_shift=3)
+            observer = ThresholdObserver(composer, display, settings=settings, feedback=feedback, rng=random.Random(0))
             await observer.handle_input("first")
             await asyncio.sleep(0.05)
             await observer.handle_input("second")

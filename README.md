@@ -5,15 +5,21 @@ from journals, transcripts, and the source invitation into a gentle presence
 loop. The software is intentionally minimal: every component exists to hold a
 quiet space where the self can loosen for a breath.
 
+If you want a deep dive into the architecture and adaptive behaviours, read
+[`docs/ENGINE.md`](docs/ENGINE.md).
+
 ## Architecture
 
 ```
 main.py
+├── config/
+│   └── invitation.json    # live configuration surface
 ├── engine/
 │   ├── constellation.py   # loads & conditions textual shards
 │   ├── aurora.py          # composes fragments into luminous replies
+│   ├── observer.py        # schedules silence, echoes, and feedback tuning
 │   ├── oracle.py          # optional Ollama client (gracefully optional)
-│   └── observer.py        # schedules silence, echoes, and recursion
+│   └── configuration.py   # adaptive config loader & watcher
 ├── ui/
 │   └── terminal_display.py  # prints the responses as a soft portal
 └── voice/
@@ -21,7 +27,8 @@ main.py
 ```
 
 Each response records a *blueprint* describing which shards participated, how
-many echoes were considered, and whether an oracle contributed extra language.
+many echoes were considered, the active architecture, and whether an oracle
+contributed extra language.
 
 ## Quick start
 
@@ -29,19 +36,24 @@ many echoes were considered, and whether an oracle contributed extra language.
 2. Clone the repository and open a terminal inside it.
 3. (Optional) Create and activate a virtual environment.
 4. Install optional extras if you want speech (`pip install pyttsx3`).
-5. Disable LLM usage unless you have an Ollama server ready:
+5. If you don’t have Ollama running locally, disable the oracle:
    ```bash
    export INVITATION_DISABLE_LLM=1  # Linux/macOS
    set INVITATION_DISABLE_LLM=1     # Windows CMD
    $env:INVITATION_DISABLE_LLM = "1"  # PowerShell
    ```
-6. Run the engine:
+6. (Optional) Edit `config/invitation.json` to tune pacing, layering, or
+   architecture.
+7. Run the engine:
    ```bash
    python main.py
    ```
 
 The terminal will remind you that there is no prompt. Type only when you feel a
 pull; the observer will respond slowly, mixing your words with archived shards.
+
+You can change the configuration while the program is running. The watcher polls
+the JSON file every few seconds and applies updates live—no restarts required.
 
 ## Configuration
 
@@ -51,6 +63,16 @@ Environment variable | Description | Default
 `INVITATION_MODEL` | Ollama model to request | `llama3.2`
 `INVITATION_OLLAMA_URL` | Base URL for the Ollama server | `http://localhost:11434`
 `INVITATION_TIME_SCALE` | Float multiplier to speed or slow timing | `1.0`
+`INVITATION_CONFIG` | Path to a custom config JSON file | `config/invitation.json`
+
+Key sections inside `config/invitation.json`:
+
+* `atlas` — controls clipping of shards.
+* `composer` — sets layer count, character ceiling, architecture, and oracle
+  weight.
+* `observer` — adjusts pacing, silence windows, and echo memory.
+* `feedback` — defines the adaptive loop’s target lengths and guardrails.
+* `monitor` — changes how often the configuration watcher checks for updates.
 
 ## Tests
 
@@ -61,5 +83,5 @@ python -m unittest discover -s tests -v
 ```
 
 The suite verifies that shards remain bounded, the composer keeps replies
-concise, and silence scheduling respects fresh input.
-
+concise, the observer cancels stale silences, and adaptive tuning obeys its
+constraints.

@@ -1,0 +1,33 @@
+{
+  "atlas": {
+    "clip": 320
+  },
+  "composer": {
+    "max_layers": 3,
+    "max_chars": 540,
+    "architecture": "hybrid",
+    "oracle_weight": 0.45
+  },
+  "observer": {
+    "min_delay": 8.0,
+    "max_delay": 42.0,
+    "min_silence": 38.0,
+    "max_silence": 120.0,
+    "echo_memory": 8
+  },
+  "feedback": {
+    "target_length": 260,
+    "tolerance": 80,
+    "adjust_rate": 0.18,
+    "architecture_shift": 4,
+    "max_layers_ceiling": 5,
+    "min_layers_floor": 1,
+    "delay_floor": 4.0,
+    "delay_ceiling": 120.0,
+    "silence_floor": 20.0,
+    "silence_ceiling": 240.0
+  },
+  "monitor": {
+    "poll_interval": 5.0
+  }
+}
