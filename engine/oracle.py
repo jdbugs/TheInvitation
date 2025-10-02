@@ -1,4 +1,4 @@
-"""Optional oracle client — whispers from a local Ollama instance."""
+"""Optional oracle client that talks to Ollama."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -18,27 +18,16 @@ class OracleSettings:
     base_url: str
     model: str
     enabled: bool
-    request_timeout: float = 12.0
-    response_timeout: float = 6.0
+    timeout: float
 
 
 class OracleClient:
-    """A dependency-light async wrapper around the Ollama HTTP API."""
-
     def __init__(self, settings: OracleSettings) -> None:
         self._settings = settings
 
     @property
     def enabled(self) -> bool:
         return self._settings.enabled
-
-    @property
-    def response_timeout(self) -> float:
-        return self._settings.response_timeout
-
-    @property
-    def request_timeout(self) -> float:
-        return self._settings.request_timeout
 
     @classmethod
     def from_config(cls, config: OracleConfig) -> "OracleClient":
@@ -51,19 +40,24 @@ class OracleClient:
                 base_url=config.base_url,
                 model=config.model,
                 enabled=True,
-                request_timeout=config.request_timeout,
-                response_timeout=config.response_timeout,
+                timeout=config.timeout,
             )
         )
 
     @classmethod
     def disabled(cls) -> "OracleClient":
-        return cls(OracleSettings(base_url="", model="", enabled=False))
+        return cls(OracleSettings(base_url="", model="", enabled=False, timeout=0.0))
 
-    async def dream(self, prompt: str) -> str | None:
+    async def generate(self, prompt: str) -> str | None:
         if not self.enabled:
             return None
-        payload = json.dumps({"model": self._settings.model, "prompt": prompt, "stream": False}).encode("utf-8")
+        payload = json.dumps(
+            {
+                "model": self._settings.model,
+                "prompt": prompt,
+                "stream": False,
+            }
+        ).encode("utf-8")
         request = urllib.request.Request(
             f"{self._settings.base_url}/api/generate",
             data=payload,
@@ -71,11 +65,11 @@ class OracleClient:
         )
         loop = asyncio.get_running_loop()
         try:
-            raw = await loop.run_in_executor(None, self._execute, request, self._settings.request_timeout)
-        except (urllib.error.URLError, TimeoutError) as exc:  # pragma: no cover - I/O failures
+            raw = await loop.run_in_executor(None, self._execute, request, self._settings.timeout)
+        except (urllib.error.URLError, TimeoutError) as exc:  # pragma: no cover - network errors
             LOGGER.warning("oracle connection failed: %s", exc)
             return None
-        except Exception as exc:  # pragma: no cover - defensive guard
+        except Exception as exc:  # pragma: no cover - defensive
             LOGGER.exception("oracle raised unexpected error: %s", exc)
             return None
         try:
@@ -88,7 +82,7 @@ class OracleClient:
 
     @staticmethod
     def _execute(request: urllib.request.Request, timeout: float) -> bytes:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310 (local endpoint)
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310
             return response.read()
 
 

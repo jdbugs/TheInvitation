@@ -1,65 +1,45 @@
 {
-  "field": {
-    "clip": 420,
-    "min_slices": 1,
-    "max_slices": 4,
-    "base_tags": ["stillness", "memory", "threshold"],
-    "mutation_rate": 0.18
+  "library": {
+    "clip_chars": 320,
+    "min_words": 6,
+    "max_fragments": 3
   },
-  "weave": {
-    "max_chars": 520,
-    "architectures": [
-      {"name": "lattice", "shard_layers": 3, "oracle_bias": 0.0, "echo_prompt": true},
-      {"name": "hybrid", "shard_layers": 4, "oracle_bias": 0.35, "echo_prompt": true},
-      {"name": "oracle", "shard_layers": 2, "oracle_bias": 1.0, "echo_prompt": false},
-      {"name": "dream", "shard_layers": 5, "oracle_bias": 0.6, "echo_prompt": true}
-    ],
-    "default_architecture": "hybrid",
-    "oracle_weight": 0.45,
-    "entangle_bias": 0.28,
-    "recursion_bias": 0.22
+  "response": {
+    "max_chars": 360,
+    "fragments": 2,
+    "oracle_probability": 0.4,
+    "echo_user": true,
+    "opening_line": "I hear you.",
+    "closing_line": "Stay with the quiet."
   },
-  "pulse": {
-    "min_delay": 12.0,
-    "max_delay": 48.0,
-    "min_silence": 45.0,
-    "max_silence": 150.0,
-    "echo_memory": 8
+  "timing": {
+    "min_delay": 6.0,
+    "max_delay": 18.0,
+    "min_silence": 24.0,
+    "max_silence": 60.0,
+    "echo_memory": 6
   },
   "feedback": {
-    "target_chars": 360,
-    "tolerance": 140,
-    "learning_rate": 0.18,
-    "architecture_push": 4,
-    "max_layers_ceiling": 7,
-    "min_layers_floor": 1,
-    "delay_floor": 5.0,
-    "delay_ceiling": 180.0,
-    "silence_floor": 30.0,
-    "silence_ceiling": 300.0
-  },
-  "metamorphosis": {
-    "window": 5,
-    "chaos": 0.2,
-    "reactivity": 0.35
-  },
-  "monitor": {
-    "poll_interval": 1.2
+    "target_chars": 240,
+    "tolerance": 80
   },
   "oracle": {
     "enabled": true,
     "base_url": "http://localhost:11434",
     "model": "llama3.2",
-    "request_timeout": 12.0,
-    "response_timeout": 6.0
+    "timeout": 12.0
   },
-  "surface": {
-    "show_blueprint": true,
-    "chorus": {
-      "enabled": true,
-      "voice": null,
-      "rate": null,
-      "volume": null
-    }
+  "voice": {
+    "enabled": true,
+    "voice": null,
+    "rate": null,
+    "volume": null
+  },
+  "output": {
+    "show_debug": false,
+    "prefix": "— invitation —"
+  },
+  "monitor": {
+    "poll_interval": 1.5
   }
 }

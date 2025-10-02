@@ -1,10 +1,10 @@
-"""Terminal surface for the invitation engine."""
+"""Terminal surface for the Invitation engine."""
 from __future__ import annotations
 
 import asyncio
 import logging
 
-from engine.aurora import WeaveResponse
+from engine.composer import Response
 from voice.tts_interface import AmbientChorus
 
 LOGGER = logging.getLogger("invitation.display")
@@ -14,14 +14,16 @@ class TerminalPortal:
     def __init__(
         self,
         *,
-        writer=None,
-        show_blueprint: bool = True,
+        prefix: str,
+        show_debug: bool,
         chorus: AmbientChorus | None = None,
+        writer=None,
     ) -> None:
+        self._prefix = prefix
+        self._show_debug = show_debug
+        self._chorus = chorus
         self._writer = writer or print
         self._lock = asyncio.Lock()
-        self._show_blueprint = show_blueprint
-        self._chorus = chorus
 
     async def banner(self) -> None:
         await self._emit_lines(
@@ -31,24 +33,22 @@ class TerminalPortal:
             ]
         )
 
-    async def emit(self, response: WeaveResponse) -> None:
-        blueprint = response.blueprint
-        channel = blueprint.get("channel", "?")
-        architecture = blueprint.get("architecture", "?")
-        layers = blueprint.get("layers", [])
-        oracle_note = "oracle" if blueprint.get("oracle") else "shards"
-        lines = ["", response.text]
-        if self._show_blueprint:
-            summary = f"[{channel}:{architecture}] {len(response.text)} chars :: {len(layers)} layers :: {oracle_note}"
-            lines.append(summary)
+    async def emit(self, response: Response) -> None:
+        lines = ["", self._prefix, response.text]
+        if self._show_debug:
+            oracle_note = "oracle" if response.used_oracle else "library"
+            lines.append(f"[{response.channel}] {len(response.text)} chars :: {oracle_note}")
+            for fragment in response.fragments:
+                lines.append(f"  • {fragment.source}: {fragment.text}")
         await self._emit_lines(lines)
         await self._speak(response.text)
 
     async def close(self) -> None:
         return None
 
-    def apply_surface(self, *, show_blueprint: bool, chorus: AmbientChorus | None) -> None:
-        self._show_blueprint = show_blueprint
+    def apply_surface(self, *, prefix: str, show_debug: bool, chorus: AmbientChorus | None) -> None:
+        self._prefix = prefix
+        self._show_debug = show_debug
         self._chorus = chorus
 
     async def _emit_lines(self, lines: list[str]) -> None:
