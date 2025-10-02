@@ -11,7 +11,9 @@ from engine.composer import ResponseComposer
 from engine.configuration import (
     AdaptiveConfig,
     EngineConfig,
+    OracleConfig,
     TimingConfig,
+    VoiceConfig,
     resolve_config_path,
 )
 from engine.library import SeedLibrary
@@ -47,7 +49,8 @@ def _scale_timing(timing: TimingConfig) -> TimingConfig:
     )
 
 
-def _build_chorus(config) -> AmbientChorus | None:
+def _build_chorus(config: VoiceConfig) -> AmbientChorus | None:
+    """Return an ``AmbientChorus`` when enabled and available."""
     if not config.enabled:
         return None
     chorus = AmbientChorus(
@@ -59,7 +62,8 @@ def _build_chorus(config) -> AmbientChorus | None:
     return chorus if chorus.enabled else None
 
 
-def _build_oracle(config) -> OracleClient:
+def _build_oracle(config: OracleConfig) -> OracleClient:
+    """Construct an oracle client that respects the current configuration."""
     return OracleClient.from_config(config)
 
 

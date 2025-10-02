@@ -67,8 +67,17 @@ class PresenceLoop:
             raise
         finally:
             reader.cancel()
+            input_future.cancel()
+            silence_task = self._cancel_silence()
             with contextlib.suppress(asyncio.CancelledError):
                 await reader
+            with contextlib.suppress(asyncio.CancelledError):
+                await input_future
+            if silence_task is not None:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await silence_task
+            await self._portal.close()
+            self._running = False
 
     def apply(self, *, timing: TimingConfig, feedback: FeedbackConfig) -> None:
         self._timing = timing
@@ -98,10 +107,13 @@ class PresenceLoop:
         LOGGER.debug("scheduling silence response in %.1fs", delay)
         self._silence_task = asyncio.create_task(self._deliver_silence(delay, token))
 
-    def _cancel_silence(self) -> None:
-        if self._silence_task:
-            self._silence_task.cancel()
-            self._silence_task = None
+    def _cancel_silence(self) -> asyncio.Task | None:
+        if not self._silence_task:
+            return None
+        task = self._silence_task
+        task.cancel()
+        self._silence_task = None
+        return task
 
     async def _deliver_silence(self, delay: float, token: int) -> None:
         try:

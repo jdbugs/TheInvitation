@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 LOGGER = logging.getLogger("invitation.voice")
 
@@ -25,14 +26,11 @@ class AmbientChorus:
         try:
             import pyttsx3  # type: ignore
         except Exception as exc:  # pragma: no cover - optional dependency
+            suggestion = "==2.90" if sys.version_info >= (3, 13) else ""
             LOGGER.warning(
-                "pyttsx3 not available; chorus silent (import error: %s)",
+                "pyttsx3 not available (%s); chorus silent. Install with `pip install pyttsx3%s` using the same interpreter as main.py.",
                 exc,
-                exc_info=True,
-            )
-            LOGGER.warning(
-                "install pyttsx3 in the same interpreter you use for main.py; "
-                "Python 3.13 users may need `pip install pyttsx3==2.90`"
+                suggestion,
             )
             self._enabled = False
         else:
