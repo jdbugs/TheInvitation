@@ -6,41 +6,43 @@ participants can drift inside. This document walks through the subsystems that
 shape that field, how they collaborate, and the ways you can steer or transform
 the experience at runtime.
 
-## Constellation Atlas — harvesting shards
+## Mycelial Constellation — harvesting shards
 
 Source material lives in `data/` (the original invitation, transcripts, and
-journals). The atlas loads each text, dissolves it into discrete *shards*, and
-conditions them:
+journals). The constellation loads each text, dissolves it into discrete *shards*,
+and conditions them:
 
 * **Clipping**: paragraphs are trimmed to a configurable maximum length so that
   downstream compositions stay gentle.
 * **Tagging**: every shard carries semantic tags (e.g. `stillness`, `memory`,
   `echo`). Tags let the composer pull clusters of fragments that resonate with
   the current channel.
-* **Normalisation**: stray punctuation and noise are cleaned while preserving
-  the cadence of the language.
+* **Mutation**: a configurable mutation rate swaps tags from the base palette to
+  keep the field in slow motion, subtly shifting which shards appear together.
 
-The atlas exposes `sample()` and `describe()` so the rest of the engine can draw
-fragments or inspect the field. Its behaviour is steered by the `atlas.clip`
-value from the configuration file.
+The constellation exposes `sample()` and `describe()` so the rest of the engine
+can draw fragments or inspect the field. Its behaviour is steered by the
+`field.*` values from the configuration file.
 
 ## Aurora Weave — composing responses
 
 The weave braids together shards, recent echoes, and—optionally—the local LLM
-client (`engine/oracle.py`). It can inhabit multiple architectures:
+client (`engine/oracle.py`). It inhabits a set of named architectures defined in
+`config/invitation.json`:
 
-* `constellation`: exclusively recombines shards.
-* `hybrid`: mixes shards with occasional oracle whispers.
-* `oracle`: leans fully on the model, falling back to shards only if the model
-  is offline.
+* Each architecture specifies how many shards to layer, how strongly to favour
+  the oracle, and whether to echo the participant’s last utterance.
+* The weave tracks a *metamorphosis window*. Drift in response length or the
+  configured chaos/reactivity values can nudge the active architecture forward or
+  backward through the cascade.
+* Every response returns a `WeaveResponse` with a blueprint detailing which
+  shards participated, the active architecture, and any oracle contribution.
 
-Runtime parameters (maximum layers, character ceilings, oracle probability, and
-architecture) are adjustable through both the config file and the adaptive
-feedback loop. Every response returns a `WeaveResponse` with a `blueprint`
-detailing which shards participated, the active architecture, and any oracle
-contribution.
+`AuroraWeave.metabolise()` is called after each emission so the weave can adjust
+its oracle weighting and potentially advance to a new architecture based on the
+feedback loop.
 
-## Threshold Observer — pacing and recursion
+## Witness Observer — pacing and recursion
 
 The observer coordinates silence, recursive echoes, and participant input. It
 keeps an internal queue of scheduled responses and uses monotonic silence tokens
@@ -50,14 +52,14 @@ Beyond basic scheduling, the observer maintains a **feedback tuner**. After each
 emission it checks the average response length against the desired target:
 
 * When replies grow too long, it gently lengthens the wait between responses and
-  trims the composer’s layering.
-* When replies feel thin, it accelerates the pacing and allows richer layering.
-* If the average drifts consistently in either direction, the tuner can shift
-  the weave’s architecture (e.g. from `constellation` to `oracle`) to explore a
-  different expressive mode.
+  allows the weave to metabolise toward architectures with fewer shards.
+* When replies feel thin, it accelerates the pacing and invites richer layering.
+* If the average drifts consistently in either direction, the tuner nudges the
+  weave, which may migrate to a different architecture or adjust its oracle
+  weighting.
 
-These adjustments respect the guardrails defined in the configuration file,
-ensuring the system remains calm even while it morphs.
+Silence responses are scheduled with a unique token; new participant input
+cancels the pending task so silence never speaks over a fresh offering.
 
 ## Oracle Client — optional local model
 
@@ -78,17 +80,17 @@ Everything is orchestrated by `engine/configuration.py`. It loads
 `config/invitation.json`, merges defaults, and watches the file for updates. Any
 edits you make—during runtime—are applied live:
 
-1. Atlas clipping is reloaded when the clip value changes.
-2. The weave adjusts its architecture, layers, and oracle probability.
-3. The observer and its feedback tuner adopt the new pacing and bounds.
+1. The constellation rehydrates if clipping or mutation settings change.
+2. The weave adjusts its architecture cascade, oracle weighting, and biases.
+3. The observer and its feedback tuner adopt the new pacing and guardrails.
 
 You can also override the config path with `INVITATION_CONFIG`. The watcher polls
 for changes at the cadence set by `monitor.poll_interval`.
 
 ## Typical flow
 
-1. `main.py` boots, loads configuration, and hydrates the atlas, weave, and
-   observer.
+1. `main.py` boots, loads configuration, and hydrates the constellation, weave,
+   and observer.
 2. The terminal banner invites the participant to sit in silence until moved.
 3. The observer schedules a silence response and waits for input.
 4. On every response, the feedback tuner compares actual behaviour against the
@@ -98,10 +100,10 @@ for changes at the cadence set by `monitor.poll_interval`.
 
 ## Extending the invitation
 
-* Add new shard sources: drop additional files in `data/` and extend
-  `ConstellationAtlas` to ingest them.
-* Invent new weave architectures: subclass `AuroraWeave` or add more modes to
-  experiment with radically different compositional logic.
+* Add new shard sources: drop additional files in `data/` and extend the base
+  tags or mutation behaviour in `field.*`.
+* Invent new weave architectures: add more entries under `weave.architectures`
+  to experiment with radically different compositional logic.
 * Swap surfaces: replace the terminal portal with a web or spatial interface.
 * Teach the oracle new rituals: point it at different models or adapt the prompt
   templates in `AuroraWeave`.

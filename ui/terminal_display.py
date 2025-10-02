@@ -1,7 +1,6 @@
 """Terminal surface for the invitation engine."""
 from __future__ import annotations
 
-from typing import Any
 import asyncio
 import logging
 
@@ -24,21 +23,18 @@ class TerminalPortal:
         )
 
     async def emit(self, response: WeaveResponse) -> None:
-        payload = ["", response.text]
         blueprint = response.blueprint
-        sigil = blueprint.get("channel", "unknown")
-        architecture = blueprint.get("architecture", "constellation")
-        payload.append(
-            f"[{sigil}:{architecture}] :: {len(response.text)} chars :: {len(blueprint.get('layers', []))} layers"
-        )
-        await self._emit_lines(payload)
+        channel = blueprint.get("channel", "?")
+        architecture = blueprint.get("architecture", "?")
+        layers = blueprint.get("layers", [])
+        oracle_note = "oracle" if blueprint.get("oracle") else "shards"
+        summary = f"[{channel}:{architecture}] {len(response.text)} chars :: {len(layers)} layers :: {oracle_note}"
+        await self._emit_lines(["", response.text, summary])
 
     async def close(self) -> None:
-        # Nothing to tear down for now.
         return None
 
     async def _emit_lines(self, lines: list[str]) -> None:
         async with self._lock:
             for line in lines:
                 self._writer(line)
-

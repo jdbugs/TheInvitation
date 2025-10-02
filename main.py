@@ -8,12 +8,11 @@ import os
 import contextlib
 
 from engine.aurora import AuroraWeave
-from engine.constellation import ConstellationAtlas
+from engine.constellation import MycelialConstellation
 from engine.configuration import AdaptiveConfig, EngineConfig, resolve_config_path
-from engine.observer import FeedbackSettings, ObserverSettings, ThresholdObserver
+from engine.observer import FeedbackTuning, PulseSettings, WitnessObserver
 from engine.oracle import OracleClient
 from ui.terminal_display import TerminalPortal
-
 
 LOGGER = logging.getLogger("invitation.main")
 
@@ -26,11 +25,11 @@ def _configure_logging() -> None:
     )
 
 
-def _time_scaled(settings: ObserverSettings) -> ObserverSettings:
+def _scaled(settings: PulseSettings) -> PulseSettings:
     scale = float(os.environ.get("INVITATION_TIME_SCALE", "1.0"))
     if scale <= 0:
         return settings
-    return ObserverSettings(
+    return PulseSettings(
         min_delay=settings.min_delay * scale,
         max_delay=settings.max_delay * scale,
         min_silence=settings.min_silence * scale,
@@ -46,34 +45,32 @@ async def main() -> None:
     adaptive = AdaptiveConfig(config_path)
     snapshot = adaptive.snapshot()
 
-    atlas = ConstellationAtlas.from_data_dir(base / "data", clip=snapshot.atlas.clip)
+    constellation = MycelialConstellation.from_data_dir(base / "data", snapshot.field)
     oracle = OracleClient.from_env()
     weave = AuroraWeave(
-        atlas,
+        constellation,
+        config=snapshot.weave,
+        metamorphosis=snapshot.metamorphosis,
         oracle=oracle,
-        max_layers=snapshot.composer.max_layers,
-        max_chars=snapshot.composer.max_chars,
-        architecture=snapshot.composer.architecture,
-        oracle_weight=snapshot.composer.oracle_weight,
     )
     display = TerminalPortal()
-    observer = ThresholdObserver(
+    observer = WitnessObserver(
         weave,
         display,
-        settings=_time_scaled(
-            ObserverSettings(
-                min_delay=snapshot.observer.min_delay,
-                max_delay=snapshot.observer.max_delay,
-                min_silence=snapshot.observer.min_silence,
-                max_silence=snapshot.observer.max_silence,
-                echo_memory=snapshot.observer.echo_memory,
+        settings=_scaled(
+            PulseSettings(
+                min_delay=snapshot.pulse.min_delay,
+                max_delay=snapshot.pulse.max_delay,
+                min_silence=snapshot.pulse.min_silence,
+                max_silence=snapshot.pulse.max_silence,
+                echo_memory=snapshot.pulse.echo_memory,
             )
         ),
-        feedback=FeedbackSettings(
-            target_length=snapshot.feedback.target_length,
+        tuning=FeedbackTuning(
+            target_chars=snapshot.feedback.target_chars,
             tolerance=snapshot.feedback.tolerance,
-            adjust_rate=snapshot.feedback.adjust_rate,
-            architecture_shift=snapshot.feedback.architecture_shift,
+            learning_rate=snapshot.feedback.learning_rate,
+            architecture_push=snapshot.feedback.architecture_push,
             max_layers_ceiling=snapshot.feedback.max_layers_ceiling,
             min_layers_floor=snapshot.feedback.min_layers_floor,
             delay_floor=snapshot.feedback.delay_floor,
@@ -86,31 +83,26 @@ async def main() -> None:
     current_config = snapshot
 
     def apply(update: EngineConfig) -> None:
-        nonlocal atlas, current_config
-        if update.atlas.clip != current_config.atlas.clip:
-            atlas = ConstellationAtlas.from_data_dir(base / "data", clip=update.atlas.clip)
-            weave.set_atlas(atlas)
-        weave.reconfigure(
-            max_layers=update.composer.max_layers,
-            max_chars=update.composer.max_chars,
-            architecture=update.composer.architecture,
-            oracle_weight=update.composer.oracle_weight,
-        )
+        nonlocal constellation, current_config
+        if update.field != current_config.field:
+            constellation = MycelialConstellation.from_data_dir(base / "data", update.field)
+            weave.set_constellation(constellation)
+        weave.reconfigure(weave=update.weave, metamorphosis=update.metamorphosis)
         observer.apply_config(
-            _time_scaled(
-                ObserverSettings(
-                    min_delay=update.observer.min_delay,
-                    max_delay=update.observer.max_delay,
-                    min_silence=update.observer.min_silence,
-                    max_silence=update.observer.max_silence,
-                    echo_memory=update.observer.echo_memory,
+            settings=_scaled(
+                PulseSettings(
+                    min_delay=update.pulse.min_delay,
+                    max_delay=update.pulse.max_delay,
+                    min_silence=update.pulse.min_silence,
+                    max_silence=update.pulse.max_silence,
+                    echo_memory=update.pulse.echo_memory,
                 )
             ),
-            FeedbackSettings(
-                target_length=update.feedback.target_length,
+            tuning=FeedbackTuning(
+                target_chars=update.feedback.target_chars,
                 tolerance=update.feedback.tolerance,
-                adjust_rate=update.feedback.adjust_rate,
-                architecture_shift=update.feedback.architecture_shift,
+                learning_rate=update.feedback.learning_rate,
+                architecture_push=update.feedback.architecture_push,
                 max_layers_ceiling=update.feedback.max_layers_ceiling,
                 min_layers_floor=update.feedback.min_layers_floor,
                 delay_floor=update.feedback.delay_floor,
@@ -140,4 +132,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         pass
-

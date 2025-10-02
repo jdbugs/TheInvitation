@@ -1,162 +1,180 @@
-"""Constellation atlas for the ambient invitation engine.
-
-This module curates textual shards drawn from the source material and
-conditions them into short, luminous fragments that can be recombined by the
-composer. The atlas is intentionally opinionated: each shard is tagged, clipped,
-and normalized so downstream code can orchestrate rituals without worrying
-about runaway verbosity.
-"""
+"""Mycelial constellation — harvests and mutates luminous shards."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Sequence
-import json
+from typing import Iterable, List, Mapping, Sequence
+import hashlib
+import logging
 import random
 import re
 
+from .configuration import FieldConfig
 
-_SHARD_CLIP = 360
-_MIN_WORDS = 6
+LOGGER = logging.getLogger("invitation.constellation")
 
 
-def _normalize(text: str) -> str:
-    """Collapse whitespace and strip stray punctuation."""
-    collapsed = re.sub(r"\s+", " ", text.strip())
-    # Preserve em dashes and ellipses but trim trailing commas/periods.
-    collapsed = re.sub(r"[,;]+$", "", collapsed)
-    return collapsed
+_SHARD_SPLIT = re.compile(r"\n\s*\n")
+_WHITESPACE = re.compile(r"\s+")
 
 
 @dataclass(frozen=True)
-class Shard:
-    """A conditioned fragment of source text."""
+class LuminousShard:
+    """A conditioned language shard with provenance and signature."""
 
     text: str
+    tags: tuple[str, ...]
     source: str
-    tags: Sequence[str]
-
-    def describe(self) -> str:
-        tag_display = ",".join(self.tags)
-        return f"<{self.source}:{tag_display}> {self.text[:80]}…" if len(self.text) > 80 else f"<{self.source}:{tag_display}> {self.text}"
+    signature: str
 
 
-class ConstellationAtlas:
-    """Loads, clips, and serves ritual shards for the composer."""
+class MycelialConstellation:
+    """Maintains a field of shards and provides adaptive sampling."""
 
     def __init__(
         self,
-        shards: Iterable[Shard],
+        shards: Sequence[LuminousShard],
         *,
-        clip: int = _SHARD_CLIP,
+        clip: int,
+        min_slices: int,
+        max_slices: int,
+        base_tags: Sequence[str],
+        mutation_rate: float,
         rng: random.Random | None = None,
     ) -> None:
+        if not shards:
+            raise ValueError("constellation requires at least one shard")
+        self._shards = list(shards)
         self._clip = clip
+        self._min_slices = min_slices
+        self._max_slices = max(max_slices, min_slices)
+        self._base_tags = tuple(base_tags)
+        self._mutation_rate = mutation_rate
         self._rng = rng or random.Random()
-        self._shards: List[Shard] = []
-        self._by_tag: dict[str, List[Shard]] = {}
-        for shard in shards:
-            conditioned = self._condition(shard)
-            if conditioned is None:
-                continue
-            self._shards.append(conditioned)
-            for tag in conditioned.tags:
-                self._by_tag.setdefault(tag, []).append(conditioned)
-        if not self._shards:
-            raise ValueError("ConstellationAtlas requires at least one shard")
+        self._tag_index = self._build_index(shards)
 
     @classmethod
     def from_data_dir(
         cls,
-        data_dir: Path,
+        path: Path,
+        config: FieldConfig,
         *,
-        clip: int = _SHARD_CLIP,
         rng: random.Random | None = None,
-    ) -> "ConstellationAtlas":
-        """Factory that hydrates the atlas from the repository data files."""
-        invitation = cls._ingest_invitation(data_dir / "The_Invitation.txt")
-        transcripts = cls._ingest_transcripts(data_dir / "transcripts.txt")
-        journals = cls._ingest_journals(data_dir / "journals.json")
-        shards = list(invitation) + list(transcripts) + list(journals)
-        return cls(shards, clip=clip, rng=rng)
+    ) -> "MycelialConstellation":
+        shards: List[LuminousShard] = []
+        for file_path in sorted(path.glob("*.txt")):
+            text = file_path.read_text(encoding="utf-8")
+            for fragment in _normalise_and_clip(text, config.clip):
+                tags = tuple(sorted(_derive_tags(file_path.name, fragment, config.base_tags)))
+                signature = hashlib.sha256(f"{file_path.name}|{fragment}".encode("utf-8")).hexdigest()[:16]
+                shards.append(
+                    LuminousShard(
+                        text=fragment,
+                        tags=tags,
+                        source=file_path.stem,
+                        signature=signature,
+                    )
+                )
+        if not shards:
+            raise ValueError(f"no shards discovered under {path}")
+        LOGGER.info("constellation loaded %s shards from %s", len(shards), path)
+        return cls(
+            shards,
+            clip=config.clip,
+            min_slices=config.min_slices,
+            max_slices=config.max_slices,
+            base_tags=config.base_tags,
+            mutation_rate=config.mutation_rate,
+            rng=rng,
+        )
 
-    @staticmethod
-    def _ingest_invitation(path: Path) -> Iterable[Shard]:
-        if not path.exists():
-            return []
-        text = path.read_text(encoding="utf-8")
-        for paragraph in text.split("\n\n"):
-            normalized = _normalize(paragraph)
-            if not normalized:
-                continue
-            yield Shard(normalized, "invitation", ("invocation", "stillness"))
+    def sample(self, tags: Sequence[str] | None, *, limit: int | None = None) -> List[LuminousShard]:
+        limit = max(self._min_slices, min(self._max_slices, limit or self._max_slices))
+        palette = list(tags or self._base_tags)
+        if not palette:
+            palette = list(self._base_tags)
+        selection: List[LuminousShard] = []
+        attempts = 0
+        while len(selection) < limit and attempts < limit * 6:
+            attempts += 1
+            tag = self._rng.choice(palette)
+            shard = self._pick_by_tag(tag)
+            if shard not in selection:
+                selection.append(self._mutate(shard))
+        if len(selection) < limit:
+            LOGGER.debug("sampling shortfall: %s < %s", len(selection), limit)
+            remaining = [shard for shard in self._shards if shard not in selection]
+            self._rng.shuffle(remaining)
+            selection.extend(remaining[: max(0, limit - len(selection))])
+        return selection[:limit]
 
-    @staticmethod
-    def _ingest_transcripts(path: Path) -> Iterable[Shard]:
-        if not path.exists():
-            return []
-        lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-        buffer: List[str] = []
-        for line in lines:
-            if line.startswith("User:") or line.startswith("System:"):
-                speaker, remainder = line.split(":", 1)
-                buffer.append(f"{speaker.strip()} {remainder.strip()}")
-            else:
-                buffer.append(line)
-            if len(buffer) >= 2:
-                joined = _normalize(" ".join(buffer))
-                buffer.clear()
-                yield Shard(joined, "transcript", ("echo", "threshold"))
-        if buffer:
-            yield Shard(_normalize(" ".join(buffer)), "transcript", ("echo", "threshold"))
+    def describe(self) -> Mapping[str, int]:
+        counts: dict[str, int] = {}
+        for shard in self._shards:
+            for tag in shard.tags:
+                counts[tag] = counts.get(tag, 0) + 1
+        return counts
 
-    @staticmethod
-    def _ingest_journals(path: Path) -> Iterable[Shard]:
-        if not path.exists():
-            return []
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        for entry in raw:
-            text = entry.get("text") or ""
-            for paragraph in text.split("\n\n"):
-                normalized = _normalize(paragraph)
-                if not normalized:
-                    continue
-                yield Shard(normalized, "journal", ("memory", "breath"))
+    def _pick_by_tag(self, tag: str) -> LuminousShard:
+        bucket = self._tag_index.get(tag)
+        if bucket:
+            return self._rng.choice(bucket)
+        return self._rng.choice(self._shards)
 
-    def _condition(self, shard: Shard) -> Shard | None:
-        normalized = _normalize(shard.text)
-        if not normalized:
-            return None
-        if len(normalized.split()) < _MIN_WORDS:
-            return None
-        clipped = normalized if len(normalized) <= self._clip else normalized[: self._clip - 1].rstrip() + "…"
-        return Shard(clipped, shard.source, tuple(sorted(set(shard.tags))))
+    def _mutate(self, shard: LuminousShard) -> LuminousShard:
+        if self._rng.random() >= self._mutation_rate:
+            return shard
+        mutated_tags = list(shard.tags)
+        if mutated_tags and self._base_tags:
+            swap_index = self._rng.randrange(len(mutated_tags))
+            mutated_tags[swap_index] = self._rng.choice(self._base_tags)
+        whispered = shard.text
+        if len(whispered) > self._clip:
+            whispered = whispered[: self._clip - 1].rstrip() + "…"
+        return LuminousShard(
+            text=whispered,
+            tags=tuple(sorted(mutated_tags)) or shard.tags,
+            source=shard.source,
+            signature=shard.signature,
+        )
 
-    def sample(self, *, tags: Sequence[str] | None = None, limit: int = 2) -> List[Shard]:
-        """Draw a handful of shards optionally biased by tags."""
-        if limit <= 0:
-            return []
-        pool: List[Shard]
-        if tags:
-            tagged: List[Shard] = []
-            for tag in tags:
-                tagged.extend(self._by_tag.get(tag, []))
-            pool = tagged or self._shards
-        else:
-            pool = self._shards
-        picks = self._rng.sample(pool, k=min(limit, len(pool)))
-        # Deduplicate while preserving order.
-        seen = set()
-        unique: List[Shard] = []
-        for shard in picks:
-            if shard.text in seen:
-                continue
-            seen.add(shard.text)
-            unique.append(shard)
-        return unique
+    def _build_index(self, shards: Sequence[LuminousShard]) -> Mapping[str, List[LuminousShard]]:
+        index: dict[str, List[LuminousShard]] = {}
+        for shard in shards:
+            for tag in shard.tags:
+                index.setdefault(tag, []).append(shard)
+        return index
 
-    def describe(self, limit: int = 5) -> List[str]:
-        """Return human-readable shard descriptions for debugging."""
-        preview = self._rng.sample(self._shards, k=min(limit, len(self._shards)))
-        return [shard.describe() for shard in preview]
 
+def _normalise_and_clip(text: str, clip: int) -> Iterable[str]:
+    for chunk in _SHARD_SPLIT.split(text.strip()):
+        cleaned = _WHITESPACE.sub(" ", chunk).strip()
+        if not cleaned:
+            continue
+        if len(cleaned) > clip:
+            cleaned = cleaned[: clip - 1].rstrip() + "…"
+        yield cleaned
+
+
+def _derive_tags(name: str, fragment: str, base_tags: Sequence[str]) -> Iterable[str]:
+    tags = set(base_tags)
+    if "journal" in name:
+        tags.add("journal")
+    if "invitation" in name:
+        tags.add("invitation")
+    if "transcript" in name:
+        tags.add("transcript")
+    lowered = fragment.lower()
+    if "breath" in lowered:
+        tags.add("breath")
+    if "silence" in lowered:
+        tags.add("silence")
+    if "love" in lowered:
+        tags.add("love")
+    if "remember" in lowered:
+        tags.add("memory")
+    if "threshold" in lowered:
+        tags.add("threshold")
+    if "surrender" in lowered:
+        tags.add("surrender")
+    return tags

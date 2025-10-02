@@ -1,72 +1,72 @@
-"""Threshold observer — orchestrates timing and recursion."""
+"""Witness observer — orchestrates timing, recursion, and feedback loops."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Deque, Iterable, List, Optional
+from typing import Deque, Iterable, List, Sequence
 import asyncio
 import logging
 import random
 from collections import deque
 
-from .aurora import AuroraWeave, WeaveRequest, WeaveResponse
+from .aurora import AuroraWeave, WeaveImpulse, WeaveResponse
 
 LOGGER = logging.getLogger("invitation.observer")
 
 
 @dataclass
-class ObserverSettings:
-    min_delay: float = 12.0
-    max_delay: float = 48.0
-    min_silence: float = 45.0
-    max_silence: float = 120.0
-    echo_memory: int = 6
+class PulseSettings:
+    min_delay: float
+    max_delay: float
+    min_silence: float
+    max_silence: float
+    echo_memory: int
 
 
 @dataclass
-class FeedbackSettings:
-    target_length: int = 240
-    tolerance: int = 80
-    adjust_rate: float = 0.15
-    architecture_shift: int = 4
-    max_layers_ceiling: int = 5
-    min_layers_floor: int = 1
-    delay_floor: float = 4.0
-    delay_ceiling: float = 120.0
-    silence_floor: float = 20.0
-    silence_ceiling: float = 240.0
+class FeedbackTuning:
+    target_chars: int
+    tolerance: int
+    learning_rate: float
+    architecture_push: int
+    max_layers_ceiling: int
+    min_layers_floor: int
+    delay_floor: float
+    delay_ceiling: float
+    silence_floor: float
+    silence_ceiling: float
 
 
-class ThresholdObserver:
-    """Coordinates input, silence, and recursive breath."""
+class WitnessObserver:
+    """Coordinates the breathing loop with recursive feedback."""
 
     def __init__(
         self,
-        composer: AuroraWeave,
+        weave: AuroraWeave,
         display,
         *,
-        settings: ObserverSettings | None = None,
-        feedback: FeedbackSettings | None = None,
+        settings: PulseSettings,
+        tuning: FeedbackTuning,
         loop: asyncio.AbstractEventLoop | None = None,
         rng: random.Random | None = None,
     ) -> None:
-        self._composer = composer
+        self._weave = weave
         self._display = display
-        self._settings = settings or ObserverSettings()
-        self._feedback = feedback or FeedbackSettings()
+        self._settings = settings
+        self._tuning = tuning
         self._loop = loop or asyncio.get_event_loop()
         self._rng = rng or random.Random()
-        self._pending: List[asyncio.Task] = []
         self._silence_token = 0
         self._silence_task: asyncio.Task | None = None
-        self._echoes: Deque[str] = deque(maxlen=self._settings.echo_memory)
+        self._pending: List[asyncio.Task] = []
         self._running = False
-        self._recent_lengths: Deque[int] = deque(maxlen=max(2, self._feedback.architecture_shift * 2))
-        self._drift = 0
+        self._echoes: Deque[str] = deque(maxlen=settings.echo_memory)
+        self._recent_lengths: Deque[int] = deque(maxlen=max(4, tuning.architecture_push * 2))
+        self._palette = ["presence", "threshold", "mirror", "surrender", "witness"]
 
     async def run(self) -> None:
         self._running = True
-        LOGGER.info("threshold observer awake")
         await self._display.banner()
+        LOGGER.info("witness observer initiated (architecture=%s)", self._weave.active_architecture)
         self._schedule_silence()
         try:
             while self._running:
@@ -79,16 +79,17 @@ class ThresholdObserver:
 
     async def handle_input(self, text: str) -> None:
         clean = text.strip()
-        LOGGER.info("received %d chars", len(clean))
+        LOGGER.info("participant offered %d chars", len(clean))
         self._cancel_silence()
-        await self._plan(channel="input", payload=clean)
+        await self._plan(channel="input", payload=clean, tags=["participant"])
         self._schedule_silence()
 
     async def trigger_recursive(self) -> None:
-        LOGGER.debug("triggering recursive echo")
-        await self._plan(channel="recursive", payload="")
+        await self._plan(channel="recursive", payload="", tags=["echo"])
 
     async def aclose(self) -> None:
+        if not self._running:
+            return
         self._running = False
         self._cancel_silence()
         for task in list(self._pending):
@@ -96,40 +97,56 @@ class ThresholdObserver:
         self._pending.clear()
         await self._display.close()
 
-    async def _read_line(self) -> Optional[str]:
+    async def _read_line(self) -> str | None:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, input)
+        try:
+            return await loop.run_in_executor(None, input)
+        except (EOFError, KeyboardInterrupt):
+            return None
 
-    async def _plan(self, *, channel: str, payload: str) -> None:
+    async def _plan(self, *, channel: str, payload: str, tags: Sequence[str]) -> None:
         delay = self._rng.uniform(self._settings.min_delay, self._settings.max_delay)
-        LOGGER.debug("planning %s in %.2fs", channel, delay)
+        signature = self._silence_token if channel == "silence" else None
+        flavour = self._mutate_tags(tags)
+        LOGGER.debug("planning %s in %.2fs with tags=%s", channel, delay, flavour)
 
-        async def deliver(token: int | None = None) -> None:
-            if channel == "silence" and token != self._silence_token:
-                LOGGER.debug("stale silence skipped (token %s != %s)", token, self._silence_token)
+        async def deliver(expected_token: int | None) -> None:
+            if expected_token is not None and expected_token != self._silence_token:
+                LOGGER.debug("stale silence task skipped")
                 return
             await asyncio.sleep(delay)
-            request = WeaveRequest(channel=channel, prompt=payload or None, echoes=list(self._echoes))
-            response = await self._composer.compose(request)
+            impulse = WeaveImpulse(
+                channel=channel,
+                utterance=payload or None,
+                echoes=list(self._echoes),
+                tags=flavour,
+            )
+            response = await self._weave.compose(impulse)
             await self._display.emit(response)
             if response.text:
                 self._echoes.append(response.text)
                 self._register_response(response)
+                self._maybe_schedule_recursive()
 
-        token = self._silence_token if channel == "silence" else None
-        task = self._loop.create_task(deliver(token))
+        task = self._loop.create_task(deliver(signature))
         self._pending.append(task)
-        task.add_done_callback(lambda t: self._pending.remove(t) if t in self._pending else None)
+        task.add_done_callback(lambda fut: self._pending.remove(fut) if fut in self._pending else None)
+
+    def _mutate_tags(self, tags: Sequence[str]) -> List[str]:
+        palette = list(tags)
+        if self._rng.random() < self._weave.entangle_bias:
+            palette.append(self._rng.choice(self._palette))
+        return palette
 
     def _schedule_silence(self) -> None:
-        delay = self._rng.uniform(self._settings.min_silence, self._settings.max_silence)
         self._silence_token += 1
         token = self._silence_token
-        LOGGER.debug("scheduling silence %s for %.2fs", token, delay)
+        delay = self._rng.uniform(self._settings.min_silence, self._settings.max_silence)
+        LOGGER.debug("scheduling silence %s in %.2fs", token, delay)
 
         async def deliver() -> None:
             await asyncio.sleep(delay)
-            await self._plan(channel="silence", payload="")
+            await self._plan(channel="silence", payload="", tags=["silence"])
 
         if self._silence_task:
             self._silence_task.cancel()
@@ -138,92 +155,63 @@ class ThresholdObserver:
     def _cancel_silence(self) -> None:
         self._silence_token += 1
         if self._silence_task:
-            LOGGER.debug("cancelling silence %s", self._silence_token)
             self._silence_task.cancel()
             self._silence_task = None
 
-    def update_settings(self, settings: ObserverSettings) -> None:
-        LOGGER.info(
-            "observer reconfigured (delay %.2f-%.2fs, silence %.2f-%.2fs, echo_memory=%s)",
-            settings.min_delay,
-            settings.max_delay,
-            settings.min_silence,
-            settings.max_silence,
-            settings.echo_memory,
-        )
+    def apply_config(self, *, settings: PulseSettings, tuning: FeedbackTuning) -> None:
+        LOGGER.info("observer reconfigured (delay %.1f-%.1fs, silence %.1f-%.1fs)", settings.min_delay, settings.max_delay, settings.min_silence, settings.max_silence)
         self._settings = settings
+        self._tuning = tuning
         self._echoes = deque(list(self._echoes)[-settings.echo_memory :], maxlen=settings.echo_memory)
-
-    def apply_feedback(self, feedback: FeedbackSettings) -> None:
-        LOGGER.info(
-            "feedback tuning updated (target=%s, tolerance=%s, shift=%s)",
-            feedback.target_length,
-            feedback.tolerance,
-            feedback.architecture_shift,
-        )
-        self._feedback = feedback
-        self._recent_lengths = deque(list(self._recent_lengths)[-max(2, feedback.architecture_shift * 2) :], maxlen=max(2, feedback.architecture_shift * 2))
-
-    def apply_config(self, settings: ObserverSettings, feedback: FeedbackSettings) -> None:
-        self.update_settings(settings)
-        self.apply_feedback(feedback)
+        self._recent_lengths = deque(list(self._recent_lengths)[-max(4, tuning.architecture_push * 2) :], maxlen=max(4, tuning.architecture_push * 2))
 
     def _register_response(self, response: WeaveResponse) -> None:
-        if not response.text:
-            return
-        self._recent_lengths.append(len(response.text))
+        length = len(response.text)
+        self._recent_lengths.append(length)
+        tuning = self._tuning
+        self._weave.metabolise(
+            length=length,
+            target=tuning.target_chars,
+            tolerance=tuning.tolerance,
+            learning_rate=tuning.learning_rate,
+            architecture_push=tuning.architecture_push,
+        )
         if len(self._recent_lengths) < 2:
             return
         average = sum(self._recent_lengths) / len(self._recent_lengths)
-        delta = average - self._feedback.target_length
-        if abs(delta) <= self._feedback.tolerance:
-            self._drift = int(self._drift * 0.5)
-            return
-        if delta > 0:
-            self._adjust_layers(-1)
-            self._rescale_delays(1.0 + self._feedback.adjust_rate)
-            self._drift = min(self._drift + 1, self._feedback.architecture_shift + 1)
-        else:
-            self._adjust_layers(1)
-            self._rescale_delays(max(0.3, 1.0 - self._feedback.adjust_rate))
-            self._drift = max(self._drift - 1, -(self._feedback.architecture_shift + 1))
-        self._shift_architecture_if_needed()
-
-    def _adjust_layers(self, delta: int) -> None:
-        current = self._composer.max_layers
-        target = current + delta
-        target = min(self._feedback.max_layers_ceiling, max(self._feedback.min_layers_floor, target))
-        if target != current:
-            LOGGER.debug("adjusting layers from %s to %s", current, target)
-            self._composer.reconfigure(max_layers=target)
+        if average > tuning.target_chars + tuning.tolerance:
+            self._rescale_delays(1.0 + tuning.learning_rate)
+        elif average < tuning.target_chars - tuning.tolerance:
+            self._rescale_delays(max(0.2, 1.0 - tuning.learning_rate))
 
     def _rescale_delays(self, factor: float) -> None:
         def clamp(value: float, floor: float, ceiling: float) -> float:
             return max(floor, min(ceiling, value))
 
-        min_delay = clamp(self._settings.min_delay * factor, self._feedback.delay_floor, self._feedback.delay_ceiling)
-        max_delay = clamp(self._settings.max_delay * factor, min_delay, self._feedback.delay_ceiling)
-        min_silence = clamp(self._settings.min_silence * factor, self._feedback.silence_floor, self._feedback.silence_ceiling)
-        max_silence = clamp(self._settings.max_silence * factor, min_silence, self._feedback.silence_ceiling)
-
-        new_settings = ObserverSettings(
+        settings = self._settings
+        tuning = self._tuning
+        min_delay = clamp(settings.min_delay * factor, tuning.delay_floor, tuning.delay_ceiling)
+        max_delay = clamp(settings.max_delay * factor, min_delay, tuning.delay_ceiling)
+        min_silence = clamp(settings.min_silence * factor, tuning.silence_floor, tuning.silence_ceiling)
+        max_silence = clamp(settings.max_silence * factor, min_silence, tuning.silence_ceiling)
+        self._settings = PulseSettings(
             min_delay=min_delay,
             max_delay=max_delay,
             min_silence=min_silence,
             max_silence=max_silence,
-            echo_memory=self._settings.echo_memory,
+            echo_memory=settings.echo_memory,
         )
-        self.update_settings(new_settings)
+        LOGGER.debug(
+            "delays rescaled to %.1f-%.1fs (silence %.1f-%.1fs)",
+            min_delay,
+            max_delay,
+            min_silence,
+            max_silence,
+        )
 
-    def _shift_architecture_if_needed(self) -> None:
-        if self._drift >= self._feedback.architecture_shift:
-            if self._composer.architecture != "oracle":
-                LOGGER.info("feedback drift shifting architecture -> oracle")
-                self._composer.reconfigure(architecture="oracle")
-            self._drift = self._feedback.architecture_shift // 2
-        elif self._drift <= -self._feedback.architecture_shift:
-            if self._composer.architecture != "constellation":
-                LOGGER.info("feedback drift shifting architecture -> constellation")
-                self._composer.reconfigure(architecture="constellation")
-            self._drift = -(self._feedback.architecture_shift // 2)
+    def _maybe_schedule_recursive(self) -> None:
+        if self._rng.random() < self._weave.recursion_bias:
+            self._loop.create_task(self.trigger_recursive())
 
+
+__all__ = ["WitnessObserver", "PulseSettings", "FeedbackTuning"]

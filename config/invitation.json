@@ -1,33 +1,49 @@
 {
-  "atlas": {
-    "clip": 320
+  "field": {
+    "clip": 420,
+    "min_slices": 1,
+    "max_slices": 4,
+    "base_tags": ["stillness", "memory", "threshold"],
+    "mutation_rate": 0.18
   },
-  "composer": {
-    "max_layers": 3,
-    "max_chars": 540,
-    "architecture": "hybrid",
-    "oracle_weight": 0.45
+  "weave": {
+    "max_chars": 520,
+    "architectures": [
+      {"name": "lattice", "shard_layers": 3, "oracle_bias": 0.0, "echo_prompt": true},
+      {"name": "hybrid", "shard_layers": 4, "oracle_bias": 0.35, "echo_prompt": true},
+      {"name": "oracle", "shard_layers": 2, "oracle_bias": 1.0, "echo_prompt": false},
+      {"name": "dream", "shard_layers": 5, "oracle_bias": 0.6, "echo_prompt": true}
+    ],
+    "default_architecture": "hybrid",
+    "oracle_weight": 0.45,
+    "entangle_bias": 0.28,
+    "recursion_bias": 0.22
   },
-  "observer": {
-    "min_delay": 8.0,
-    "max_delay": 42.0,
-    "min_silence": 38.0,
-    "max_silence": 120.0,
+  "pulse": {
+    "min_delay": 12.0,
+    "max_delay": 48.0,
+    "min_silence": 45.0,
+    "max_silence": 150.0,
     "echo_memory": 8
   },
   "feedback": {
-    "target_length": 260,
-    "tolerance": 80,
-    "adjust_rate": 0.18,
-    "architecture_shift": 4,
-    "max_layers_ceiling": 5,
+    "target_chars": 360,
+    "tolerance": 140,
+    "learning_rate": 0.18,
+    "architecture_push": 4,
+    "max_layers_ceiling": 7,
     "min_layers_floor": 1,
-    "delay_floor": 4.0,
-    "delay_ceiling": 120.0,
-    "silence_floor": 20.0,
-    "silence_ceiling": 240.0
+    "delay_floor": 5.0,
+    "delay_ceiling": 180.0,
+    "silence_floor": 30.0,
+    "silence_ceiling": 300.0
+  },
+  "metamorphosis": {
+    "window": 5,
+    "chaos": 0.2,
+    "reactivity": 0.35
   },
   "monitor": {
-    "poll_interval": 5.0
+    "poll_interval": 1.2
   }
 }

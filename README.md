@@ -15,11 +15,11 @@ main.py
 ├── config/
 │   └── invitation.json    # live configuration surface
 ├── engine/
-│   ├── constellation.py   # loads & conditions textual shards
-│   ├── aurora.py          # composes fragments into luminous replies
-│   ├── observer.py        # schedules silence, echoes, and feedback tuning
+│   ├── constellation.py   # mycelial field of clipped & tagged shards
+│   ├── aurora.py          # adaptive weave of shards, echoes, and oracle whispers
+│   ├── observer.py        # witness loop with recursive feedback & silence tokens
 │   ├── oracle.py          # optional Ollama client (gracefully optional)
-│   └── configuration.py   # adaptive config loader & watcher
+│   └── configuration.py   # flux configuration loader & watcher
 ├── ui/
 │   └── terminal_display.py  # prints the responses as a soft portal
 └── voice/
@@ -67,11 +67,12 @@ Environment variable | Description | Default
 
 Key sections inside `config/invitation.json`:
 
-* `atlas` — controls clipping of shards.
-* `composer` — sets layer count, character ceiling, architecture, and oracle
-  weight.
-* `observer` — adjusts pacing, silence windows, and echo memory.
-* `feedback` — defines the adaptive loop’s target lengths and guardrails.
+* `field` — controls clipping, slice counts, and mutation when harvesting shards.
+* `weave` — defines the available architectures, oracle weighting, and the
+  entangle/recursion biases for the composer.
+* `pulse` — adjusts pacing, silence windows, and echo memory.
+* `feedback` — sets the adaptive targets for response length and delay scaling.
+* `metamorphosis` — governs how quickly the weave drifts between architectures.
 * `monitor` — changes how often the configuration watcher checks for updates.
 
 ## Tests
@@ -82,6 +83,6 @@ Run everything:
 python -m unittest discover -s tests -v
 ```
 
-The suite verifies that shards remain bounded, the composer keeps replies
-concise, the observer cancels stale silences, and adaptive tuning obeys its
-constraints.
+The suite verifies that shards remain bounded, the weave composes luminous but
+finite replies, the observer cancels stale silences while triggering recursive
+breaths, and the configuration layer applies live edits safely.

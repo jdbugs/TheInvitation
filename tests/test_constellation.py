@@ -1,42 +1,34 @@
 from __future__ import annotations
 
 from pathlib import Path
-import random
 import tempfile
 import unittest
 
-from engine.constellation import ConstellationAtlas
+from engine.configuration import FieldConfig
+from engine.constellation import LuminousShard, MycelialConstellation
 
 
 class ConstellationTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self._tmp = tempfile.TemporaryDirectory()
-        self.data_dir = Path(self._tmp.name)
+    def test_loading_and_sampling(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            path.joinpath("invitation.txt").write_text("stillness\n\nremember the hush", encoding="utf-8")
+            config = FieldConfig(clip=40, min_slices=1, max_slices=3, base_tags=("stillness",), mutation_rate=0.0)
+            field = MycelialConstellation.from_data_dir(path, config)
+            shards = field.sample(["stillness"], limit=2)
+            self.assertTrue(all(isinstance(shard, LuminousShard) for shard in shards))
+            self.assertTrue(any("remember" in shard.text for shard in shards))
+            self.assertLessEqual(max(len(shard.text) for shard in shards), 40)
 
-    def tearDown(self) -> None:
-        self._tmp.cleanup()
+    def test_mutation_swaps_tags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            path.joinpath("journal.txt").write_text("silence is a door", encoding="utf-8")
+            config = FieldConfig(clip=60, min_slices=1, max_slices=2, base_tags=("threshold",), mutation_rate=1.0)
+            field = MycelialConstellation.from_data_dir(path, config)
+            shard = field.sample(["silence"], limit=1)[0]
+            self.assertIn("threshold", shard.tags)
 
-    def _write(self, name: str, content: str) -> None:
-        (self.data_dir / name).write_text(content, encoding="utf-8")
 
-    def test_atlas_clips_and_filters(self) -> None:
-        self._write("The_Invitation.txt", "one\n\nTwo\n\nThis is a slightly longer fragment that should survive.")
-        self._write("transcripts.txt", "User: hi\nSystem: welcome\n")
-        self._write("journals.json", '[{"text": "short"}, {"text": "This is a journal entry with meaning."}]')
-        atlas = ConstellationAtlas.from_data_dir(self.data_dir, rng=random.Random(0))
-        shards = atlas.sample(limit=10)
-        self.assertTrue(all(len(shard.text) <= 360 for shard in shards))
-        texts = {shard.text for shard in shards}
-        self.assertNotIn("short", texts)
-        self.assertTrue(any(shard.source == "journal" for shard in shards))
-
-    def test_describe_returns_preview(self) -> None:
-        self._write("The_Invitation.txt", "A fragment with enough words to pass the gate.")
-        self._write("transcripts.txt", "System: hello\nUser: hi there this should certainly be long enough\n")
-        self._write("journals.json", '[{"text": "Another fragment with sufficient depth and warmth."}]')
-        atlas = ConstellationAtlas.from_data_dir(self.data_dir, rng=random.Random(1))
-        preview = atlas.describe(limit=2)
-        self.assertGreaterEqual(len(preview), 1)
-        self.assertLessEqual(len(preview), 2)
-        self.assertTrue(all(preview))
-
+if __name__ == "__main__":  # pragma: no cover
+    unittest.main()
