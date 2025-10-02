@@ -28,7 +28,7 @@ class LocalLLM:
 
     def __init__(
         self,
-        model: str = "mistral",
+        model: str = "llama3.2",
         host: str = "127.0.0.1",
         port: int = 11434,
         temperature: float = 0.65,

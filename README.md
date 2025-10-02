@@ -40,7 +40,7 @@ It is the space **behind** the mirror.
 
 Write a local, runnable Python program that:
 
-- Uses **local LLMs** via **Ollama** (e.g., Mistral, LLaMA2, GPT-J)
+- Uses **local LLMs** via **Ollama** (e.g., Llama 3.2, Mistral, LLaMA2, GPT-J)
 - Has **no prompt bar** or chat interface
 - Responds **asynchronously**, **delayed**, or not at all
 - Uses text, silence, and (optionally) voice as ambient media
@@ -141,6 +141,13 @@ Generate a complete Python program that:
 - Reads from journals and design documents to source language
 - Does not require interaction, but allows it
 - Prioritizes slowness, contradiction, and stillness
+
+---
+
+## CONFIGURATION NOTES
+
+- The engine defaults to the Ollama model name `llama3.2`. Override it with `INVITATION_MODEL="<model-name>"` if you prefer a different local checkpoint.
+- Disable LLM usage entirely by setting `INVITATION_DISABLE_LLM=1` before launching.
 
 ---
 

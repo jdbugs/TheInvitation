@@ -45,7 +45,7 @@ async def _build_presence_loop() -> PresenceLoop:
 
     echo = EchoChamber(max_items=72)
 
-    model_name = os.getenv("INVITATION_MODEL", "mistral")
+    model_name = os.getenv("INVITATION_MODEL", "llama3.2")
     enable_llm = os.getenv("INVITATION_DISABLE_LLM", "0") != "1"
     llm: Optional[LocalLLM]
     if enable_llm:
