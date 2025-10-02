@@ -1,11 +1,11 @@
 """Entry point for the Invitation prototype."""
 from __future__ import annotations
 
-from pathlib import Path
 import asyncio
 import contextlib
 import logging
 import os
+from pathlib import Path
 
 from engine.composer import ResponseComposer
 from engine.configuration import (

@@ -32,7 +32,11 @@ class ComposerTests(unittest.IsolatedAsyncioTestCase):
         fragments = [SeedFragment(text="A small fragment.", source="a.txt")]
         library = StaticLibrary(fragments)
         oracle = StubOracle(text=None)
-        composer = ResponseComposer(library, ResponseConfig(opening_line="Hello", closing_line="Goodbye."), oracle)  # type: ignore[arg-type]
+        composer = ResponseComposer(  # type: ignore[arg-type]
+            library,
+            ResponseConfig(opening_line="Hello", closing_line="Goodbye."),
+            oracle,
+        )
         response = await composer.craft(user_text="Who are you?", channel="input")
         self.assertIn("You said: Who are you?", response.text)
         self.assertTrue(response.text.endswith("Goodbye."))
