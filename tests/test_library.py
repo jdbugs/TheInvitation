@@ -32,6 +32,19 @@ class SeedLibraryTests(unittest.TestCase):
             picks = library.pick(5)
         self.assertEqual(len(picks), 1)
 
+    def test_pick_respects_avoid_list(self) -> None:
+        config = LibraryConfig(clip_chars=120, min_words=1, max_fragments=4)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            Path(path, "a.txt").write_text("alpha beta gamma", encoding="utf-8")
+            Path(path, "b.txt").write_text("delta epsilon zeta", encoding="utf-8")
+            library = SeedLibrary.from_path(path, config)
+            first = library.pick(1)
+            second = library.pick(1, avoid={frag.text for frag in first})
+        self.assertEqual(len(first), 1)
+        self.assertEqual(len(second), 1)
+        self.assertNotEqual(first[0].text, second[0].text)
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

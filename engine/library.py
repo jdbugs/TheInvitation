@@ -40,13 +40,18 @@ class SeedLibrary:
         LOGGER.info("library harvested %d fragments", len(seeds))
         return cls(seeds, config)
 
-    def pick(self, count: int) -> list[SeedFragment]:
+    def pick(self, count: int, *, avoid: set[str] | None = None) -> list[SeedFragment]:
         if not self._seeds:
             return []
-        limit = min(count, len(self._seeds), max(1, self._config.max_fragments))
-        if limit == len(self._seeds):
-            return list(self._seeds)
-        return self._rng.sample(self._seeds, k=limit)
+        pool = self._seeds
+        if avoid:
+            filtered = [seed for seed in self._seeds if seed.text.strip() not in avoid]
+            if filtered:
+                pool = filtered
+        limit = min(count, len(pool), max(1, self._config.max_fragments))
+        if limit == len(pool):
+            return list(pool)
+        return self._rng.sample(pool, k=limit)
 
     @staticmethod
     def _harvest_file(file: Path, config: LibraryConfig) -> list[SeedFragment]:

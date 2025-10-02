@@ -27,6 +27,9 @@ class ResponseConfig:
     echo_user: bool = True
     opening_line: str = "I hear you."
     closing_line: str = "Stay with the quiet."
+    acknowledgement_variants: tuple[str, ...] = ()
+    closing_variants: tuple[str, ...] = ()
+    recent_fragment_window: int = 6
 
 
 @dataclass(frozen=True)
@@ -113,10 +116,15 @@ def resolve_config_path(base: Path) -> Path | None:
 def _coerce(dataclass_type: type, payload: Dict[str, Any] | None) -> Any:
     if payload is None:
         payload = {}
-    valid_fields = {field.name for field in fields(dataclass_type)}
+    dataclass_fields = {field.name: field for field in fields(dataclass_type)}
     filtered: Dict[str, Any] = {}
     for key, value in payload.items():
-        if key in valid_fields and value is not None:
+        if key not in dataclass_fields or value is None:
+            continue
+        field = dataclass_fields[key]
+        if isinstance(value, list) and getattr(field.type, "__origin__", None) is tuple:
+            filtered[key] = tuple(value)
+        else:
             filtered[key] = value
     try:
         return dataclass_type(**filtered)

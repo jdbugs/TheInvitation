@@ -22,8 +22,9 @@ configuration file steers them.
   `library.min_words`, and clips each fragment to `library.clip_chars`.
 * Keeps track of the originating filename so the terminal can optionally show
   where a fragment came from.
-* Exposes `pick(count)` which returns up to `library.max_fragments` random
-  snippets.
+* Exposes `pick(count, *, avoid=None)` which returns up to
+  `library.max_fragments` random snippets, preferring fragments that are not in
+  the optional `avoid` set of recently used text.
 
 ## 3. Response composer (`engine/composer.py`)
 
@@ -32,10 +33,12 @@ configuration file steers them.
 * The oracle prompt is short and specific: “two sentences, kind, steady, clear”.
   If Ollama is offline or times out, the composer simply ignores the oracle and
   uses library fragments alone.
-* Replies always include the configured opening line (or an echo of what the
-  listener typed), the sampled fragments, and a closing line. Duplicate
-  fragments are collapsed, each segment is separated by a blank line for
-  legibility, and everything is clipped to `response.max_chars`.
+* Replies begin with optional intro lines: a silence marker, an echo of what the
+  listener typed, and an acknowledgement phrase chosen from the configured
+  variants (the placeholders `{input}` and `{channel}` are substituted when
+  present). Duplicate fragments are collapsed, the composer avoids recently used
+  snippets, and each reply ends with a rotating closing line. Everything is
+  separated by blank lines for legibility and clipped to `response.max_chars`.
 * `reconfigure` lets the running program swap in a fresh library, config, or
   oracle instance when the JSON file changes.
 

@@ -10,7 +10,19 @@
     "oracle_probability": 0.4,
     "echo_user": true,
     "opening_line": "I hear you.",
-    "closing_line": "Stay with the quiet."
+    "closing_line": "Stay with the quiet.",
+    "acknowledgement_variants": [
+      "I am here with you.",
+      "Breathing with what you offered.",
+      "Listening: {input}",
+      "Let’s let this be felt together."
+    ],
+    "closing_variants": [
+      "Stay with the quiet.",
+      "Let the breath linger.",
+      "You can rest here for a moment."
+    ],
+    "recent_fragment_window": 6
   },
   "timing": {
     "min_delay": 6.0,

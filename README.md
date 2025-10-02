@@ -51,10 +51,11 @@ something in you wants to speak. Responses arrive as short paragraphs such as:
 ```
 — invitation —
 You said: Can anyone hear me?
+I am here with you.
 
 One object. One sound. One light. One word.
 
-Stay with the quiet.
+You can rest here for a moment.
 ```
 
 Debug lines (fragment sources, oracle usage) are hidden by default. Turn them on
@@ -68,7 +69,7 @@ for changes and applies updates while it runs.
 Section | Purpose
 ------- | -------
 `library` | Clip length, minimum words, and how many fragments to sample.
-`response` | Maximum characters, whether to echo the listener, oracle probability, and the opening/closing tone.
+`response` | Maximum characters, listener echo, oracle probability, acknowledgement phrases, rotating closing lines, and fragment reuse memory.
 `timing` | Delay windows for silences plus how many past responses are remembered for pacing.
 `feedback` | Target length and tolerance used to nudge future silence delays.
 `oracle` | Toggle the Ollama client, model, URL, and timeout.
@@ -94,3 +95,6 @@ python -m unittest discover -s tests -v
 
 The tests cover configuration parsing, library harvesting, composer limits, and
 the presence loop’s silence cancellation safeguards.
+Acknowledgement variants accept `{input}` (the listener’s latest words) and
+`{channel}` (`input` or `silence`) placeholders. Leaving the arrays empty falls
+back to the classic “I hear you.” opening and “Stay with the quiet.” closing.

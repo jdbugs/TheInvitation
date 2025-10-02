@@ -9,8 +9,11 @@ class StaticLibrary:
     def __init__(self, fragments):
         self._fragments = list(fragments)
 
-    def pick(self, count):
-        return list(self._fragments[:count])
+    def pick(self, count, *, avoid=None):
+        avoid = {item.strip() for item in avoid or set()}
+        candidates = [frag for frag in self._fragments if frag.text.strip() not in avoid]
+        pool = candidates if candidates else self._fragments
+        return list(pool[:count])
 
 
 class StubOracle:
@@ -69,6 +72,32 @@ class ComposerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Another thought.", response.text)
         self.assertEqual(response.text.count("Repeat this."), 1)
         self.assertIn("\n\n", response.text)
+
+    async def test_recent_fragment_memory_avoids_reuse(self) -> None:
+        fragments = [
+            SeedFragment(text="First", source="a.txt"),
+            SeedFragment(text="Second", source="b.txt"),
+        ]
+        library = StaticLibrary(fragments)
+        oracle = StubOracle(text=None)
+        config = ResponseConfig(fragments=1, closing_line="", recent_fragment_window=2)
+        composer = ResponseComposer(library, config, oracle)  # type: ignore[arg-type]
+        first = await composer.craft(user_text="hi", channel="input")
+        second = await composer.craft(user_text="again", channel="input")
+        self.assertNotEqual(first.fragments[0].text, second.fragments[0].text)
+
+    async def test_acknowledgement_template_uses_input(self) -> None:
+        fragments = [SeedFragment(text="Fragment", source="a.txt")]
+        library = StaticLibrary(fragments)
+        oracle = StubOracle(text=None)
+        config = ResponseConfig(
+            fragments=1,
+            closing_line="",
+            acknowledgement_variants=("Listening: {input}",),
+        )
+        composer = ResponseComposer(library, config, oracle)  # type: ignore[arg-type]
+        response = await composer.craft(user_text="echo", channel="input")
+        self.assertIn("Listening: echo", response.text)
 
 
 if __name__ == "__main__":  # pragma: no cover
