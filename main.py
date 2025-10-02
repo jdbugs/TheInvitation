@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import random
 from pathlib import Path
@@ -13,6 +14,15 @@ from engine.local_llm import LocalLLM
 from engine.presence_loop import PresenceConfig, PresenceLoop
 from ui.terminal_display import TerminalDisplay
 from voice.tts_interface import AmbientTTS
+
+
+def _configure_logging() -> None:
+    level_name = os.getenv("INVITATION_LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
 
 
 async def _build_presence_loop() -> PresenceLoop:
@@ -80,6 +90,7 @@ async def _build_presence_loop() -> PresenceLoop:
 
 
 async def main() -> None:
+    _configure_logging()
     loop = await _build_presence_loop()
     await loop.run()
 

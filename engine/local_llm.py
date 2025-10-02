@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import random
 from dataclasses import dataclass
@@ -41,6 +42,7 @@ class LocalLLM:
         self.temperature = temperature
         self.timeout = timeout
         self.fallback = fallback if fallback is not None else self.default_fallback
+        self._log = logging.getLogger("invitation.ollama")
 
     async def generate(self, prompt: str, max_tokens: int = 120) -> LLMResult:
         """Generate a completion asynchronously.
@@ -58,8 +60,11 @@ class LocalLLM:
                 asyncio.to_thread(self._request, prompt, max_tokens),
                 timeout=self.timeout,
             )
-            return LLMResult(text=text.strip(), used_fallback=False, model=self.model)
-        except Exception:
+            cleaned = text.strip()
+            self._log.debug("ollama response ready (%d chars)", len(cleaned))
+            return LLMResult(text=cleaned, used_fallback=False, model=self.model)
+        except Exception as exc:
+            self._log.warning("ollama request failed (%s); using fallback", exc)
             simulated = self.fallback(prompt)
             return LLMResult(text=simulated.strip(), used_fallback=True, model=self.model)
 
@@ -86,7 +91,8 @@ class LocalLLM:
             )
             response = conn.getresponse()
             if response.status >= 400:
-                raise RuntimeError(f"Ollama error {response.status}: {response.read().decode('utf-8', 'ignore')}")
+                body = response.read().decode("utf-8", "ignore")
+                raise RuntimeError(f"Ollama error {response.status}: {body}")
             raw_body = response.read()
             if not raw_body:
                 return ""

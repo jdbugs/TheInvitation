@@ -148,6 +148,42 @@ Generate a complete Python program that:
 
 - The engine defaults to the Ollama model name `llama3.2`. Override it with `INVITATION_MODEL="<model-name>"` if you prefer a different local checkpoint.
 - Disable LLM usage entirely by setting `INVITATION_DISABLE_LLM=1` before launching.
+- Set `INVITATION_LOG_LEVEL=DEBUG` if you want to watch the scheduler and composer log their decisions in real time. Logging is sent to stderr so it will not disturb the ambient output stream.
+
+---
+
+## REQUIREMENTS
+
+- Python 3.10 or newer.
+- Optional: [Ollama](https://ollama.com/) running locally if you want real model output instead of the built-in fallbacks.
+- Optional: `pyttsx3` (`pip install pyttsx3`) if you want the optional whisper-like text-to-speech channel (`INVITATION_ENABLE_TTS=1`).
+
+---
+
+## RUNNING THE EXPERIENCE (STEP BY STEP)
+
+1. **Open a terminal** and switch into the project folder:
+   ```bash
+   cd /path/to/TheInvitation
+   ```
+2. **(Optional) Activate a virtual environment** so the Python packages you install stay isolated.
+3. **Decide how you want to run the loop:**
+   - To rely on local seed fragments only, export `INVITATION_DISABLE_LLM=1`.
+   - To talk to Ollama, keep an instance running (`ollama serve`) and ensure the `llama3.2` model (or whatever you set in `INVITATION_MODEL`) is pulled.
+   - To see detailed scheduler activity, export `INVITATION_LOG_LEVEL=DEBUG`.
+   - To speed up the pacing for testing, set `INVITATION_TIME_SCALE=0.2` (or any float > 0.05).
+4. **Launch the loop:**
+   ```bash
+   python main.py
+   ```
+   You will see the quiet banner:
+   ```
+   (there is no prompt)
+   wait. type only if compelled.
+   ```
+   The system may remain still for long stretches; watch the DEBUG logs (if enabled) to see when the presence loop schedules output, cancels silence responses, or composes fragments.
+5. **Type only when moved to.** Inputs are queued asynchronously, and responses surface after the configured delays. Silence is also an active trigger.
+6. **Exit gracefully** with `Ctrl+C`. The program will cancel pending tasks and close the field.
 
 ---
 

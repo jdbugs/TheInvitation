@@ -1,6 +1,7 @@
 """Ambient text composition utilities."""
 from __future__ import annotations
 
+import logging
 import random
 import re
 import textwrap
@@ -49,6 +50,8 @@ class AmbientOutputEngine:
         self._journal_fragments: List[Dict[str, str]] = []
         self._transcript_fragments: List[Dict[str, str]] = []
 
+        self._log = logging.getLogger("invitation.composer")
+
         self._load_seed_material()
         if self.llm is not None:
             self.llm.set_fallback(self._fallback_from_seeds)
@@ -59,6 +62,7 @@ class AmbientOutputEngine:
 
         fragments: List[str] = []
         metadata: Dict[str, str] = {"reason": context.reason}
+        self._log.info("assembling fragments for %s", context.reason)
 
         if context.user_input:
             mutated = self.echo.mutate_text(context.user_input, intensity=0.35)
@@ -90,9 +94,13 @@ class AmbientOutputEngine:
             if llm_text:
                 metadata["llm"] = self.llm.model
                 text = self._merge_with_llm(text, llm_text)
+                self._log.debug("merged LLM response into fragment")
+            else:
+                self._log.debug("LLM returned no text; using seed composition")
 
         source = metadata.get("llm", "seeds")
         metadata["mood"] = context.mood or "undetermined"
+        self._log.debug("fragment ready (source=%s, length=%d)", source, len(text))
         return AmbientFragment(text=text, source=source, metadata=metadata)
 
     # ------------------------------------------------------------------
@@ -232,10 +240,17 @@ class AmbientOutputEngine:
 
         try:
             result: LLMResult = await self.llm.generate(prompt)
-        except RuntimeError:
+        except RuntimeError as exc:
+            self._log.warning("ollama runtime error: %s", exc)
             return ""
-        except Exception:
+        except Exception as exc:
+            self._log.warning("ollama request failed: %s", exc)
             return ""
+
+        if result.used_fallback:
+            self._log.info("ollama unavailable; using fallback fragment")
+        else:
+            self._log.info("ollama response received (%d chars)", len(result.text))
 
         return result.text
 
