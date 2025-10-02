@@ -24,8 +24,16 @@ class AmbientChorus:
             return
         try:
             import pyttsx3  # type: ignore
-        except Exception:  # pragma: no cover - optional dependency
-            LOGGER.info("pyttsx3 not available; chorus silent")
+        except Exception as exc:  # pragma: no cover - optional dependency
+            LOGGER.warning(
+                "pyttsx3 not available; chorus silent (import error: %s)",
+                exc,
+                exc_info=True,
+            )
+            LOGGER.warning(
+                "install pyttsx3 in the same interpreter you use for main.py; "
+                "Python 3.13 users may need `pip install pyttsx3==2.90`"
+            )
             self._enabled = False
         else:
             engine = pyttsx3.init()

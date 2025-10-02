@@ -75,7 +75,9 @@ The default surface is the terminal (`ui/terminal_display.py`). It shows each
 response, along with metadata about channel, length, layers, and architecture.
 The `surface.*` section controls whether that blueprint line appears and whether
 the text-to-speech chorus (`voice/tts_interface.py`) should speak alongside the
-text. Chorus voice, rate, and volume can be tuned live.
+text. Chorus voice, rate, and volume can be tuned live. Install `pyttsx3` inside
+the same interpreter that launches `main.py`; on Python 3.13 you may need to pin
+`pyttsx3==2.90` until newer wheels arrive.
 
 ## Adaptive configuration
 

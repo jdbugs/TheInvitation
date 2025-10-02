@@ -36,6 +36,9 @@ contributed extra language.
 2. Clone the repository and open a terminal inside it.
 3. (Optional) Create and activate a virtual environment.
 4. Install optional extras if you want speech (`pip install pyttsx3`).
+   *Make sure you install it with the same Python interpreter you use for*
+   `python main.py`. Some newer Python builds (e.g., 3.13) work best with
+   `pip install pyttsx3==2.90` until fresh wheels are published.
 5. Edit `config/invitation.json` to suit your session—LLM, TTS, pacing, and
    architectures all live there and can be changed before or during a run.
 6. Run the engine:
