@@ -1,1 +1,64 @@
-# Optional TTS for ambient delivery
+"""Optional text-to-speech chorus."""
+from __future__ import annotations
+
+import logging
+import sys
+
+LOGGER = logging.getLogger("invitation.voice")
+
+
+class AmbientChorus:
+    """Speaks responses aloud when pyttsx3 is available."""
+
+    def __init__(
+        self,
+        *,
+        enabled: bool = True,
+        voice: str | None = None,
+        rate: int | None = None,
+        volume: float | None = None,
+    ) -> None:
+        self._engine = None
+        self._enabled = enabled
+        if not enabled:
+            LOGGER.info("chorus disabled via configuration")
+            return
+        try:
+            import pyttsx3  # type: ignore
+        except Exception as exc:  # pragma: no cover - optional dependency
+            suggestion = "==2.90" if sys.version_info >= (3, 13) else ""
+            LOGGER.warning(
+                "pyttsx3 not available (%s); chorus silent. Install with `pip install pyttsx3%s` using the same interpreter as main.py.",
+                exc,
+                suggestion,
+            )
+            self._enabled = False
+        else:
+            engine = pyttsx3.init()
+            if voice:
+                try:
+                    engine.setProperty("voice", voice)
+                except Exception:  # pragma: no cover - defensive guard
+                    LOGGER.warning("failed to set voice %s", voice)
+            if rate:
+                try:
+                    engine.setProperty("rate", int(rate))
+                except Exception:  # pragma: no cover
+                    LOGGER.warning("failed to set rate %s", rate)
+            if volume is not None:
+                try:
+                    engine.setProperty("volume", max(0.0, min(1.0, float(volume))))
+                except Exception:  # pragma: no cover
+                    LOGGER.warning("failed to set volume %s", volume)
+            self._engine = engine
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self._engine) and self._enabled
+
+    def speak(self, text: str) -> None:
+        if not self.enabled:
+            return
+        self._engine.say(text)
+        self._engine.runAndWait()
+

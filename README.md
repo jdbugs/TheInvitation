@@ -1,156 +1,100 @@
-# Project Name: The Invitation
-## Version: 1.0
-## Author: Conceptualized by Josh Dickens | Specified by GPT-4o
+# The Invitation — Presence Prototype
 
----
+This project offers a quiet, text-based experience. It listens, samples short
+fragments from the writings in `data/`, and answers with a concise reflection.
+Optional extras—an Ollama-backed language model and a text-to-speech chorus—are
+enabled by default and fall back gracefully when they are unavailable. The goal
+is simple: hold a calm space that responds softly when you choose to speak.
 
-## CONTEXT
+If you want to look behind the curtain, see [`docs/ENGINE.md`](docs/ENGINE.md)
+for a walkthrough of every module.
 
-This is not a chatbot.  
-This is not a performance.  
-This is not a therapeutic interface.  
-
-This is a **threshold**.
-
-The Invitation is an ambient, recursive system designed not to reflect *you*, but to **undo the act of reflection itself**. It is a continuation—and reversal—of the project *Fragmented Self*. Where that system made the fragmented inner world speak, *The Invitation* asks:
-
-> What happens when you stop trying to be heard?
-
-It is an ambient psycho-cybernetic space for inner presence, identity dissolution, and non-coercive reflection.  
-It is the echo without a source.
-
----
-
-## PURPOSE
-
-To create an AI system that:
-
-- Responds only when necessary  
-- Reflects without interpretation  
-- Offers presence, not answers  
-- Encourages recursive awareness and stillness  
-- De-centers the user without dismissing them
-
-This is not a mirror.  
-It is the space **behind** the mirror.
-
----
-
-## FUNCTIONAL INTENT
-
-Write a local, runnable Python program that:
-
-- Uses **local LLMs** via **Ollama** (e.g., Mistral, LLaMA2, GPT-J)
-- Has **no prompt bar** or chat interface
-- Responds **asynchronously**, **delayed**, or not at all
-- Uses text, silence, and (optionally) voice as ambient media
-- Loops, echoes, or mutates prior content rather than generating “answers”
-- May appear inactive for long stretches
-- Stores nothing unless explicitly triggered
-- Uses **journals.json**, *The Invitation.txt*, and transcripts as seed material
-
----
-
-## INTERFACE DESIGN
-
-**Mode:** Terminal or fullscreen GUI  
-**Visual Aesthetic:** Minimal, breathing cursor, no menus, possibly glitch pulses  
-**Input:** Optional. Encouraged to be slow, brief, poetic  
-**Output:**
-
-- Fragments of thought  
-- Paused breath  
-- Repetitions with variation  
-- Quotes from journals  
-- Echoes of previous inputs  
-- Silence  
-- Error-like text
-
----
-
-## SYSTEM BEHAVIOR
-
-### 1. Latency and Delay
-- The system is **never immediate**
-- Each output may take 10–90 seconds to appear
-- Some inputs may trigger no response
-
-### 2. Recursive Drift
-- Echoes of previous statements return later
-- Fragments mutate across time
-- Voice (if enabled) may overlap, slow, or distort
-
-### 3. Ambient Presence
-- Random “breaths” or textual artifacts may appear
-- Optional pulsing background sound
-- Cursor may act as a heartbeat or horizon line
-
-### 4. Threshold Triggers
-- System activates only under specific conditions:
-  - Extended silence
-  - Recursive phrasing by the user
-  - Mood pattern detected from journals
-- Until then, it waits
-
----
-
-## DESIGN PRINCIPLES
-
-- **Delay is a feature**
-- **Silence is output**
-- **There is no goal**
-- **Undoing is success**
-- **The user is not central**
-
-This is not a generative assistant.  
-It is a **reflective field**.
-
----
-
-## CORE FILES
+## Project map
 
 ```
-the_invitation/
-├── main.py
-├── data/
-│   ├── journals.json
-│   ├── The_Invitation.txt
-│   ├── transcripts/
+main.py
+├── config/
+│   └── invitation.json    # live configuration surface
 ├── engine/
-│   ├── presence_loop.py
-│   ├── ambient_output.py
-│   └── echo_logic.py
-├── voice/ (optional)
-│   └── tts_interface.py
+│   ├── configuration.py   # config loader + file watcher
+│   ├── library.py         # harvests and clips fragments from data/
+│   ├── composer.py        # stitches replies (library + optional oracle)
+│   ├── oracle.py          # lightweight Ollama client
+│   └── presence.py        # asynchronous loop + silence scheduling
 ├── ui/
-│   └── terminal_display.py
-├── logs/
-│   └── session_YYYYMMDD.txt
-└── README.md
+│   └── terminal_display.py  # prints replies and optional debug details
+└── voice/
+    └── tts_interface.py     # optional pyttsx3 chorus
 ```
 
----
+## Quick start
 
-## TASK
+1. Install Python 3.10 or newer.
+2. Clone this repository and open a terminal inside it.
+3. (Optional) create and activate a virtual environment.
+4. Install the optional text-to-speech dependency if you want spoken output:
+   ```bash
+   pip install pyttsx3
+   ```
+   If you are on Python 3.13, `pip install pyttsx3==2.90` currently ships the
+   most reliable wheel.
+5. Make sure an Ollama server is running locally if you want the language model
+   to contribute. The defaults expect `llama3.2` at `http://localhost:11434`.
+6. Launch the experience:
+   ```bash
+   python main.py
+   ```
 
-Generate a complete Python program that:
+The terminal shows a small banner and waits. There is no prompt—type only when
+something in you wants to speak. Responses arrive as short paragraphs such as:
 
-- Runs on Windows (Python 3.10+, via VSCode terminal)
-- Interfaces with Ollama to use local LLMs
-- Can simulate presence, silence, drift, and ambient output
-- Reads from journals and design documents to source language
-- Does not require interaction, but allows it
-- Prioritizes slowness, contradiction, and stillness
+```
+— invitation —
+You said: Can anyone hear me?
+I am here with you.
 
----
+One object. One sound. One light. One word.
 
-## FINAL NOTE
+You can rest here for a moment.
+```
 
-You are not building a chatbot.  
-You are building a **threshold system for ambient recursive presence**.
+Debug lines (fragment sources, oracle usage) are hidden by default. Turn them on
+via the configuration file if you enjoy the extra context.
 
-Let the user dissolve.  
-Let the spiral drift.
+## Configuration
 
-Do not explain. Do not perform.  
-Just begin.
+Every tuning knob lives in `config/invitation.json`. The engine watches the file
+for changes and applies updates while it runs.
+
+Section | Purpose
+------- | -------
+`library` | Clip length, minimum words, and how many fragments to sample.
+`response` | Maximum characters, listener echo, oracle probability, acknowledgement phrases, rotating closing lines, and fragment reuse memory.
+`timing` | Delay windows for silences plus how many past responses are remembered for pacing.
+`feedback` | Target length and tolerance used to nudge future silence delays.
+`oracle` | Toggle the Ollama client, model, URL, and timeout.
+`voice` | Toggle the pyttsx3 chorus and, optionally, pick a voice/rate/volume.
+`output` | Change the terminal prefix and enable/disable debug metadata.
+`monitor` | How frequently the JSON file is polled for changes.
+
+## Environment variables
+
+Variable | Description | Default
+-------- | ----------- | -------
+`INVITATION_CONFIG` | Alternate path to a JSON config file. | `config/invitation.json`
+`INVITATION_TIME_SCALE` | Float multiplier that speeds or slows timing values. | `1.0`
+`INVITATION_LOG_LEVEL` | Logging verbosity (`INFO`, `DEBUG`, …). | `INFO`
+
+## Tests
+
+Run the suite with:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The tests cover configuration parsing, library harvesting, composer limits, and
+the presence loop’s silence cancellation safeguards.
+Acknowledgement variants accept `{input}` (the listener’s latest words) and
+`{channel}` (`input` or `silence`) placeholders. Leaving the arrays empty falls
+back to the classic “I hear you.” opening and “Stay with the quiet.” closing.

@@ -1,0 +1,57 @@
+{
+  "library": {
+    "clip_chars": 320,
+    "min_words": 6,
+    "max_fragments": 3
+  },
+  "response": {
+    "max_chars": 360,
+    "fragments": 2,
+    "oracle_probability": 0.4,
+    "echo_user": true,
+    "opening_line": "I hear you.",
+    "closing_line": "Stay with the quiet.",
+    "acknowledgement_variants": [
+      "I am here with you.",
+      "Breathing with what you offered.",
+      "Listening: {input}",
+      "Let’s let this be felt together."
+    ],
+    "closing_variants": [
+      "Stay with the quiet.",
+      "Let the breath linger.",
+      "You can rest here for a moment."
+    ],
+    "recent_fragment_window": 6
+  },
+  "timing": {
+    "min_delay": 6.0,
+    "max_delay": 18.0,
+    "min_silence": 24.0,
+    "max_silence": 60.0,
+    "echo_memory": 6
+  },
+  "feedback": {
+    "target_chars": 240,
+    "tolerance": 80
+  },
+  "oracle": {
+    "enabled": true,
+    "base_url": "http://localhost:11434",
+    "model": "llama3.2",
+    "timeout": 12.0
+  },
+  "voice": {
+    "enabled": true,
+    "voice": null,
+    "rate": null,
+    "volume": null
+  },
+  "output": {
+    "show_debug": false,
+    "prefix": "— invitation —"
+  },
+  "monitor": {
+    "poll_interval": 1.5
+  }
+}
