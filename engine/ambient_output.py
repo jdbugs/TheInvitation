@@ -85,7 +85,7 @@ class AmbientOutputEngine:
             fragments.extend(self._draw_seed_set(weight="journal", count=2, mood=context.mood))
 
         fragments = [self.echo.distill_fragment(f, drift=0.25) for f in fragments if f]
-        fragments = [f for f in fragments if f]
+        fragments = [self._clip_fragment(f, max_words=80, max_chars=420) for f in fragments if f]
 
         text = self._stitch_fragments(fragments)
 
@@ -141,13 +141,14 @@ class AmbientOutputEngine:
         fragments: List[Dict[str, str]] = []
         for chunk in chunks:
             compact = " ".join(line.strip() for line in chunk.splitlines())
-            fragments.append(
-                {
-                    "text": compact,
-                    "source": source,
-                    "tags": list(extra_tags or []),
-                }
-            )
+            for piece in self._chunk_long_text(compact):
+                fragments.append(
+                    {
+                        "text": piece,
+                        "source": source,
+                        "tags": list(extra_tags or []),
+                    }
+                )
         return fragments
 
     # ------------------------------------------------------------------
@@ -193,11 +194,114 @@ class AmbientOutputEngine:
     def _stitch_fragments(self, fragments: Sequence[str]) -> str:
         if not fragments:
             return ""
-        combined = []
-        for frag in fragments:
-            wrapped = textwrap.fill(frag, width=72)
+        limited = list(fragments)[:3]
+        combined: List[str] = []
+        for frag in limited:
+            clipped = self._clip_fragment(frag)
+            if not clipped:
+                continue
+            wrapped = textwrap.fill(clipped, width=72)
             combined.append(wrapped)
         return "\n\n".join(combined)
+
+    # ------------------------------------------------------------------
+    def _chunk_long_text(
+        self, text: str, max_words: int = 80, max_chars: int = 420
+    ) -> List[str]:
+        """Yield smaller fragments from long paragraphs for ambient use."""
+
+        stripped = text.strip()
+        if not stripped:
+            return []
+
+        words = stripped.split()
+        if len(words) <= max_words and len(stripped) <= max_chars:
+            return [stripped]
+
+        sentences = re.split(r"(?<=[.!?])\s+", stripped)
+        if len(sentences) == 1:
+            return self._chunk_by_words(stripped, max_words, max_chars)
+
+        buffer: List[str] = []
+        count_words = 0
+        count_chars = 0
+        output: List[str] = []
+
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            sent_words = sentence.split()
+            tentative_words = count_words + len(sent_words)
+            tentative_chars = count_chars + len(sentence) + (1 if buffer else 0)
+            if buffer and (
+                tentative_words > max_words or tentative_chars > max_chars
+            ):
+                output.append(" ".join(buffer).strip())
+                buffer = [sentence]
+                count_words = len(sent_words)
+                count_chars = len(sentence)
+            else:
+                buffer.append(sentence)
+                count_words = tentative_words
+                count_chars = tentative_chars
+
+        if buffer:
+            output.append(" ".join(buffer).strip())
+
+        if not output:
+            return self._chunk_by_words(stripped, max_words, max_chars)
+
+        trimmed: List[str] = []
+        for chunk in output:
+            if len(chunk.split()) <= max_words and len(chunk) <= max_chars:
+                trimmed.append(chunk)
+            else:
+                trimmed.extend(self._chunk_by_words(chunk, max_words, max_chars))
+        return trimmed
+
+    # ------------------------------------------------------------------
+    def _chunk_by_words(
+        self, text: str, max_words: int = 80, max_chars: int = 420
+    ) -> List[str]:
+        words = text.split()
+        if not words:
+            return []
+
+        output: List[str] = []
+        cursor = 0
+        while cursor < len(words):
+            slice_words = words[cursor : cursor + max_words]
+            chunk = " ".join(slice_words)
+            if len(chunk) > max_chars:
+                # Trim by characters while respecting word boundaries.
+                while len(chunk) > max_chars and len(slice_words) > 1:
+                    slice_words = slice_words[:-1]
+                    chunk = " ".join(slice_words)
+            output.append(chunk.strip())
+            cursor += len(slice_words)
+        return output
+
+    # ------------------------------------------------------------------
+    def _clip_fragment(
+        self, text: str, max_words: int = 60, max_chars: int = 360
+    ) -> str:
+        cleaned = text.strip()
+        if not cleaned:
+            return ""
+
+        words = cleaned.split()
+        if len(words) <= max_words and len(cleaned) <= max_chars:
+            return cleaned
+
+        limited_words = words[:max_words]
+        clipped = " ".join(limited_words).strip()
+        if len(clipped) > max_chars:
+            clipped = clipped[:max_chars].rsplit(" ", 1)[0]
+        clipped = clipped.rstrip()
+        if clipped and clipped[-1] not in ".!?…":
+            clipped = f"{clipped} …"
+        return clipped
 
     # ------------------------------------------------------------------
     def _merge_with_llm(self, base_text: str, llm_text: str) -> str:
