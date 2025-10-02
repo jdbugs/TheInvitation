@@ -1,46 +1,26 @@
-"""Optional ambient text-to-speech support."""
+"""Optional text-to-speech chorus."""
 from __future__ import annotations
 
-import asyncio
-from typing import Optional
+import logging
 
-try:
-    import importlib
-    _pyttsx3_spec = importlib.util.find_spec("pyttsx3")  # type: ignore[attr-defined]
-    if _pyttsx3_spec is not None:
-        import pyttsx3  # type: ignore
-    else:
-        pyttsx3 = None  # type: ignore
-except Exception:  # pragma: no cover - import failure fallback
-    pyttsx3 = None  # type: ignore
+LOGGER = logging.getLogger("invitation.voice")
 
 
-class AmbientTTS:
-    """Thin wrapper around pyttsx3 if available."""
+class AmbientChorus:
+    """Speaks responses aloud when pyttsx3 is available."""
 
-    def __init__(self, enabled: bool = False, rate: int = 140) -> None:
-        self.enabled = enabled and pyttsx3 is not None
-        self._rate = rate
-        self._engine: Optional["pyttsx3.Engine"] = None
+    def __init__(self) -> None:
+        try:
+            import pyttsx3  # type: ignore
+        except Exception:  # pragma: no cover - optional dependency
+            self._engine = None
+            LOGGER.info("pyttsx3 not available; chorus silent")
+        else:
+            self._engine = pyttsx3.init()
 
-    async def speak(self, text: str) -> None:
-        if not self.enabled or not text.strip():
+    def speak(self, text: str) -> None:
+        if not self._engine:
             return
-        await asyncio.to_thread(self._speak_sync, text)
+        self._engine.say(text)
+        self._engine.runAndWait()
 
-    # ------------------------------------------------------------------
-    def _ensure_engine(self) -> Optional["pyttsx3.Engine"]:
-        if pyttsx3 is None:
-            return None
-        if self._engine is None:
-            self._engine = pyttsx3.init()  # type: ignore[call-arg]
-            self._engine.setProperty("rate", self._rate)
-            self._engine.setProperty("volume", 0.6)
-        return self._engine
-
-    def _speak_sync(self, text: str) -> None:
-        engine = self._ensure_engine()
-        if engine is None:
-            return
-        engine.say(text)
-        engine.runAndWait()

@@ -1,62 +1,41 @@
-"""Minimal terminal rendering for The Invitation."""
+"""Terminal surface for the invitation engine."""
 from __future__ import annotations
 
+from typing import Any
 import asyncio
-import sys
-import textwrap
-import threading
-from datetime import datetime
-from typing import Optional
+import logging
 
-from engine.ambient_output import AmbientFragment
+from engine.aurora import WeaveResponse
+
+LOGGER = logging.getLogger("invitation.display")
 
 
-class TerminalDisplay:
-    """Handles all terminal IO while keeping the surface minimal."""
+class TerminalPortal:
+    def __init__(self, *, writer=None) -> None:
+        self._writer = writer or print
+        self._lock = asyncio.Lock()
 
-    def __init__(self, stream=None) -> None:
-        self.stream = stream or sys.stdout
-        self._lock = threading.Lock()
-        self._start_time = datetime.now()
-
-    async def initialize(self) -> None:
-        message = (
-            "\n"
-            "(there is no prompt)\n"
-            "wait. type only if compelled.\n"
+    async def banner(self) -> None:
+        await self._emit_lines(
+            [
+                "(there is no prompt)",
+                "wait. breathe. speak only when moved.",
+            ]
         )
-        await self._write(message)
 
-    async def shutdown(self) -> None:
-        await self._write("\nclosing the field.\n")
+    async def emit(self, response: WeaveResponse) -> None:
+        payload = ["", response.text]
+        blueprint = response.blueprint
+        sigil = blueprint.get("channel", "unknown")
+        payload.append(f"[{sigil}] :: {len(response.text)} chars :: {len(blueprint.get('layers', []))} layers")
+        await self._emit_lines(payload)
 
-    async def render_fragment(self, fragment: AmbientFragment) -> None:
-        header = "\n"
-        body = self._format_text(fragment.text)
-        footer = "\n"
-        await self._write(header + body + footer)
+    async def close(self) -> None:
+        # Nothing to tear down for now.
+        return None
 
-    async def emit_breath(self) -> None:
-        breath = "\u00b7"
-        await self._write(f"\r{breath}")
-        await asyncio.sleep(0.35)
-        await self._write("\r ")
+    async def _emit_lines(self, lines: list[str]) -> None:
+        async with self._lock:
+            for line in lines:
+                self._writer(line)
 
-    def capture_input(self) -> Optional[str]:
-        try:
-            return sys.stdin.readline()
-        except Exception:
-            return None
-
-    # ------------------------------------------------------------------
-    def _format_text(self, text: str) -> str:
-        wrapped = textwrap.fill(text, width=68)
-        return wrapped
-
-    async def _write(self, text: str) -> None:
-        await asyncio.to_thread(self._write_sync, text)
-
-    def _write_sync(self, text: str) -> None:
-        with self._lock:
-            self.stream.write(text)
-            self.stream.flush()
