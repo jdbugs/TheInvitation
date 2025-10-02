@@ -53,6 +53,23 @@ class ComposerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Oracle whisper.", response.text)
         self.assertLessEqual(len(response.text), config.max_chars)
 
+    async def test_duplicate_fragments_are_collapsed(self) -> None:
+        fragments = [
+            SeedFragment(text="Repeat this.", source="a.txt"),
+            SeedFragment(text="Repeat this.", source="b.txt"),
+            SeedFragment(text="Another thought.", source="c.txt"),
+        ]
+        library = StaticLibrary(fragments)
+        oracle = StubOracle(text=None)
+        config = ResponseConfig(fragments=3, closing_line="")
+        composer = ResponseComposer(library, config, oracle)  # type: ignore[arg-type]
+        response = await composer.craft(user_text=None, channel="input")
+        self.assertEqual(len(response.fragments), 2)
+        self.assertIn("Repeat this.", response.text)
+        self.assertIn("Another thought.", response.text)
+        self.assertEqual(response.text.count("Repeat this."), 1)
+        self.assertIn("\n\n", response.text)
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

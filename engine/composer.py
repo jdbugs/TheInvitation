@@ -36,7 +36,7 @@ class ResponseComposer:
         self._rng = random.Random()
 
     async def craft(self, *, user_text: str | None, channel: str) -> Response:
-        fragments = tuple(self._library.pick(self._config.fragments))
+        fragments = tuple(_unique_fragments(self._library.pick(self._config.fragments)))
         oracle_text = None
         use_oracle = self._oracle.enabled and self._rng.random() < self._config.oracle_probability
         if use_oracle:
@@ -78,13 +78,15 @@ class ResponseComposer:
         if opening:
             pieces.append(opening)
         for fragment in fragments:
-            pieces.append(fragment.text)
-        if oracle_text:
-            pieces.append(oracle_text)
+            text = fragment.text.strip()
+            if text:
+                pieces.append(text)
+        if oracle_text and oracle_text.strip():
+            pieces.append(oracle_text.strip())
         closing = self._config.closing_line.strip()
-        if closing:
+        if closing and (not pieces or pieces[-1] != closing):
             pieces.append(closing)
-        combined = " ".join(piece.strip() for piece in pieces if piece.strip())
+        combined = "\n\n".join(piece for piece in pieces if piece)
         return _clip(combined, self._config.max_chars)
 
     def _opening_line(self, user_text: str | None, channel: str) -> str:
@@ -121,6 +123,20 @@ def _clip(text: str, limit: int) -> str:
     if last_space > 0:
         trimmed = trimmed[:last_space]
     return f"{trimmed}…"
+
+
+def _unique_fragments(fragments: Iterable[SeedFragment]) -> list[SeedFragment]:
+    seen: set[str] = set()
+    unique: list[SeedFragment] = []
+    for fragment in fragments:
+        key = fragment.text.strip()
+        if not key:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(fragment)
+    return unique
 
 
 __all__ = ["Response", "ResponseComposer"]

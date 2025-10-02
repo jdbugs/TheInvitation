@@ -50,7 +50,11 @@ something in you wants to speak. Responses arrive as short paragraphs such as:
 
 ```
 — invitation —
-You said: Can anyone hear me? One object. One sound. One light. One word. Stay with the quiet.
+You said: Can anyone hear me?
+
+One object. One sound. One light. One word.
+
+Stay with the quiet.
 ```
 
 Debug lines (fragment sources, oracle usage) are hidden by default. Turn them on

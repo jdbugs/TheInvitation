@@ -33,8 +33,9 @@ configuration file steers them.
   If Ollama is offline or times out, the composer simply ignores the oracle and
   uses library fragments alone.
 * Replies always include the configured opening line (or an echo of what the
-  listener typed), the sampled fragments, and a closing line. Everything is
-  clipped to `response.max_chars`.
+  listener typed), the sampled fragments, and a closing line. Duplicate
+  fragments are collapsed, each segment is separated by a blank line for
+  legibility, and everything is clipped to `response.max_chars`.
 * `reconfigure` lets the running program swap in a fresh library, config, or
   oracle instance when the JSON file changes.
 
