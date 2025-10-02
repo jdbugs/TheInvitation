@@ -1,0 +1,4 @@
+User: I don’t know if this is working.
+System: There is no measure of success here.
+User: I feel like I’m dissolving.
+System: Then you’re near the threshold.
