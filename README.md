@@ -92,6 +92,11 @@ Write a local, runnable Python program that:
   - Mood pattern detected from journals
 - Until then, it waits
 
+### 5. Threshold Gate
+- Each input is observed, but only some cross the gate.
+- The gate listens for recurring language, tone echoes, or long stretches of quiet.
+- When nothing qualifies, the room simply holds the silence and lets echoes drift on their own.
+
 ---
 
 ## DESIGN PRINCIPLES
@@ -127,6 +132,30 @@ the_invitation/
 ├── logs/
 │   └── session_YYYYMMDD.txt
 └── README.md
+```
+
+Run the experience locally with:
+
+```
+python main.py
+```
+
+Optionally enable the synthesized voice channel by setting `INVITATION_ENABLE_VOICE=1` in your environment before launching.
+
+### Runtime qualities
+
+- The room delays every reply by 12–32 seconds to keep the pace slow.
+- Idle stretches surface ambient "breaths" assembled from journals, transcripts, and prior speech.
+- If the local oracle is unreachable, the system drifts through harvested fragments instead of failing.
+- Output arrives as a gentle terminal stream rather than an instant block of text.
+- A threshold gate decides when to stay silent, waiting for long pauses, recursive phrasing, or resonant moods before speaking.
+
+### Dependencies
+
+Install dependencies with:
+
+```
+pip install -r requirements.txt
 ```
 
 ---
