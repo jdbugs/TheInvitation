@@ -19,8 +19,8 @@ class OracleConfig:
     model: str = "llama3.2"
     endpoint: str = "http://localhost:11434"
     temperature: float = 0.4
-    timeout: float = 45.0
-    min_retry_interval: float = 90.0
+    timeout: float = 30.0
+    min_retry_interval: float = 45.0
 
 
 class Oracle:
@@ -50,6 +50,7 @@ class Oracle:
             "model": self._config.model,
             "messages": [*context, {"role": "user", "content": prompt}],
             "options": {"temperature": self._config.temperature},
+            "stream": False,
         }
         url = f"{self._config.endpoint.rstrip('/')}/api/chat"
         try:

@@ -14,8 +14,8 @@ class ThresholdGate:
         self,
         fragments: Iterable[str],
         *,
-        silence_window: float = 75.0,
-        impulse: float = 0.18,
+        silence_window: float = 24.0,
+        impulse: float = 0.22,
         recursion_window: int = 4,
     ) -> None:
         self._silence_window = silence_window

@@ -140,12 +140,12 @@ Run the experience locally with:
 python main.py
 ```
 
-Optionally enable the synthesized voice channel by setting `INVITATION_ENABLE_VOICE=1` in your environment before launching.
+Optionally enable the synthesized voice channel by setting `INVITATION_ENABLE_VOICE=1` in your environment before launching. Set `INVITATION_INCLUDE_JOURNALS=1` if you want the ambient system to weave in fragments from `journals.json`; by default they remain private.
 
 ### Runtime qualities
 
-- The room delays every reply by 12–32 seconds to keep the pace slow.
-- Idle stretches surface ambient "breaths" assembled from journals, transcripts, and prior speech.
+- The room delays every reply by roughly 3–6 seconds to stay gentle without feeling stuck.
+- Idle stretches surface ambient "breaths" assembled from curated fragments; private journals stay opt-in.
 - If the local oracle is unreachable, the system drifts through harvested fragments instead of failing.
 - Output arrives as a gentle terminal stream rather than an instant block of text.
 - A threshold gate decides when to stay silent, waiting for long pauses, recursive phrasing, or resonant moods before speaking.
@@ -157,6 +157,8 @@ Install dependencies with:
 ```
 pip install -r requirements.txt
 ```
+
+If you want the optional synthesized voice, ensure the environment variable above is set and that `pyttsx3` is installed (it is listed in `requirements.txt`).
 
 ---
 

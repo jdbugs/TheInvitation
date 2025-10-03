@@ -12,15 +12,17 @@ LOGGER = logging.getLogger(__name__)
 class FragmentLibrary:
     """Loads text fragments from the project data directory."""
 
-    def __init__(self, data_dir: Path) -> None:
+    def __init__(self, data_dir: Path, *, include_journals: bool = False) -> None:
         self._data_dir = data_dir
+        self._include_journals = include_journals
 
     def harvest(self) -> List[str]:
         """Return a shuffled list of textual fragments."""
         fragments: List[str] = []
         fragments.extend(self._from_invitation_text())
         fragments.extend(self._from_transcripts())
-        fragments.extend(self._from_journals())
+        if self._include_journals:
+            fragments.extend(self._from_journals())
         filtered = [frag.strip() for frag in fragments if frag and frag.strip()]
         random.shuffle(filtered)
         LOGGER.info("library harvested %s fragments", len(filtered))

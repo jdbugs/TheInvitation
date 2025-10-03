@@ -36,7 +36,8 @@ async def main() -> None:
     project_root = Path(__file__).parent
     data_dir = project_root / "data"
 
-    fragments = FragmentLibrary(data_dir).harvest()
+    include_journals = os.getenv("INVITATION_INCLUDE_JOURNALS") == "1"
+    fragments = FragmentLibrary(data_dir, include_journals=include_journals).harvest()
     ambient = AmbientOutput(fragments)
     threshold = ThresholdGate(fragments)
 
