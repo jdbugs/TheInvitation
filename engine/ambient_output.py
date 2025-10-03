@@ -21,11 +21,12 @@ class AmbientOutput:
     def oracle_reply(self, prompt: str, oracle_text: str) -> str:
         self.observe(prompt)
         self.observe(oracle_text)
+        softened = self._soft_trim(oracle_text)
         sections = [
             "— invitation —",
             f"You said: {prompt.strip()}",
             "",
-            oracle_text.strip(),
+            softened,
             "",
             self._echo.drift(),
             "",
@@ -57,3 +58,11 @@ class AmbientOutput:
         assembled = "\n".join(lines)
         self.observe(assembled)
         return assembled
+
+    @staticmethod
+    def _soft_trim(text: str, limit: int = 420) -> str:
+        stripped = text.strip()
+        if len(stripped) <= limit:
+            return stripped
+        snippet = stripped[:limit].rsplit(" ", 1)[0].rstrip(" ,;:")
+        return f"{snippet} …"

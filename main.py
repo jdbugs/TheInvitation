@@ -46,7 +46,10 @@ async def main() -> None:
         "oracle primed for %s via %s", oracle.config.model, oracle.config.endpoint
     )
 
-    voice = build_voice(enabled=os.getenv("INVITATION_ENABLE_VOICE") == "1")
+    voice_mode = os.getenv("INVITATION_VOICE")
+    if voice_mode is None:
+        voice_mode = "auto" if os.getenv("INVITATION_ENABLE_VOICE") == "1" else "off"
+    voice = build_voice(voice_mode)
 
     presence_log = PresenceLog()
     display = TerminalDisplay()

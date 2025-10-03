@@ -31,8 +31,8 @@ class PresenceLoop:
     def __init__(
         self,
         *,
-        response_delay: tuple[float, float] = (2.5, 6.0),
-        idle_breath: tuple[float, float] = (14.0, 32.0),
+        response_delay: tuple[float, float] = (1.4, 3.4),
+        idle_breath: tuple[float, float] = (10.0, 20.0),
     ) -> None:
         self._response_delay = response_delay
         self._idle_breath = idle_breath
