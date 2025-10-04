@@ -92,6 +92,11 @@ Write a local, runnable Python program that:
   - Mood pattern detected from journals
 - Until then, it waits
 
+### 5. Threshold Gate
+- Each input is observed, but only some cross the gate.
+- The gate listens for recurring language, tone echoes, or long stretches of quiet.
+- When nothing qualifies, the room simply holds the silence and lets echoes drift on their own.
+
 ---
 
 ## DESIGN PRINCIPLES
@@ -128,6 +133,40 @@ the_invitation/
 │   └── session_YYYYMMDD.txt
 └── README.md
 ```
+
+Run the experience locally with:
+
+```
+python main.py
+```
+
+Optionally enable the synthesized voice channel by exporting `INVITATION_VOICE`. Use `INVITATION_VOICE=pyttsx3` to lean on the bundled Python engine or `INVITATION_VOICE=espeak` to use the system voice Josh already trusts on Windows. The legacy `INVITATION_ENABLE_VOICE=1` flag still works and maps to the automatic mode. Set `INVITATION_INCLUDE_JOURNALS=1` if you want the ambient system to weave in fragments from `journals.json`; by default they remain private.
+
+### Runtime qualities
+
+- The room delays every reply by roughly 1½–3½ seconds to stay gentle without feeling stuck.
+- Idle stretches surface ambient "breaths" assembled from curated fragments; private journals stay opt-in.
+- If the local oracle is unreachable, the system drifts through harvested fragments instead of failing.
+- Output arrives as a gentle terminal stream rather than an instant block of text.
+- A threshold gate decides when to stay silent, waiting for long pauses, recursive phrasing, or resonant moods before speaking.
+- Fragment harvesting now trims long passages into small, breath-sized glimpses so the room never dumps a diary page on stage.
+
+### Installation posture
+
+- Treat the first minute as a ritual: the prologue line appears immediately, then the room listens before it answers.
+- Invite participants to step up one at a time. The gate loosens sooner after someone speaks so the system feels alive without turning chatty.
+- Keep the oracle endpoint local and warmed; if it goes dark, the field keeps drifting through fragments instead of erroring in front of witnesses.
+- Enable `INVITATION_VOICE=espeak` on-site if you want an audible presence without tinkering—espeak is quick to install and resilient on constrained hardware.
+
+### Dependencies
+
+Install dependencies with:
+
+```
+pip install -r requirements.txt
+```
+
+If you want the optional synthesized voice, ensure the environment variable above is set and that `pyttsx3` is installed (it is listed in `requirements.txt`).
 
 ---
 
